@@ -23,7 +23,7 @@ var AnvisningerSignupFlow = (() => {
     default: () => index_default,
     initSignupFlow: () => initSignupFlow
   });
-  var BUILD_TIME = true ? "2026-02-13T14:49:06.641Z" : null;
+  var BUILD_TIME = true ? "2026-02-13T14:58:06.160Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -62,6 +62,9 @@ var AnvisningerSignupFlow = (() => {
     invoicingFieldIds: {
       ean: "EAN",
       invoiceEmail: "invoiceEmail"
+    },
+    discountFieldIds: {
+      couponCode: "rabatKode"
     }
   };
   function withDomReady(fn, useWebflowReady) {
@@ -292,6 +295,17 @@ var AnvisningerSignupFlow = (() => {
     };
     const phone = getInputValueById(config.personFieldIds.phone);
     if (phone) person.PhoneMobile = phone;
+    const subscription = {};
+    const couponCode = getInputValueById(config.discountFieldIds.couponCode);
+    if (couponCode) {
+      subscription.DiscountCouponSubscriptions = [
+        {
+          DiscountCoupon: {
+            UniqueIdentifier: couponCode
+          }
+        }
+      ];
+    }
     return {
       Person: person,
       Account: {
@@ -300,7 +314,8 @@ var AnvisningerSignupFlow = (() => {
         AntalAnsatte: state.company.employees === void 0 || state.company.employees === null ? "" : String(state.company.employees),
         EAN: getInputValueById(config.invoicingFieldIds.ean),
         Faktureringsmail: getInputValueById(config.invoicingFieldIds.invoiceEmail)
-      }
+      },
+      Subscription: subscription
     };
   }
   function initSignupFlow(userConfig = {}) {
@@ -555,7 +570,15 @@ var AnvisningerSignupFlow = (() => {
             showError(config.errorBoxId, "Outseta embed is not available.");
             return;
           }
-          const registrationDefaults = buildRegistrationDefaults(config, state);
+          const registrationDefaults = buildRegistrationDefaults(config, state) || {};
+          const personDefaults = registrationDefaults.Person || {};
+          const accountDefaults = registrationDefaults.Account || {};
+          registrationDefaults.Person = personDefaults;
+          registrationDefaults.Account = accountDefaults;
+          registrationDefaults.PersonAccount = {
+            Person: personDefaults,
+            Account: accountDefaults
+          };
           window.Outseta.auth.open({
             planUid: state.planUid,
             state: config.outsetaState,
