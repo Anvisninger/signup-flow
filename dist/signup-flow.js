@@ -23,7 +23,7 @@ var AnvisningerSignupFlow = (() => {
     default: () => index_default,
     initSignupFlow: () => initSignupFlow
   });
-  var BUILD_TIME = true ? "2026-02-13T14:35:41.674Z" : null;
+  var BUILD_TIME = true ? "2026-02-13T14:49:06.641Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -49,7 +49,20 @@ var AnvisningerSignupFlow = (() => {
       planMs: 12e3
     },
     useWebflowReady: true,
-    onPlanUidChange: null
+    onPlanUidChange: null,
+    handOffButtonId: "handOffOutseta",
+    outsetaState: "checkout",
+    registrationDefaultsBuilder: null,
+    personFieldIds: {
+      email: "Email",
+      firstName: "firstName",
+      lastName: "lastName",
+      phone: "phoneNumber"
+    },
+    invoicingFieldIds: {
+      ean: "EAN",
+      invoiceEmail: "invoiceEmail"
+    }
   };
   function withDomReady(fn, useWebflowReady) {
     if (useWebflowReady && window.Webflow && Array.isArray(window.Webflow)) {
@@ -262,6 +275,34 @@ var AnvisningerSignupFlow = (() => {
       config.onPlanUidChange(planUid);
     }
   }
+  function getInputValueById(id) {
+    if (!id) return "";
+    const el = document.getElementById(id);
+    if (!el) return "";
+    return (el.value || "").trim();
+  }
+  function buildRegistrationDefaults(config, state) {
+    if (typeof config.registrationDefaultsBuilder === "function") {
+      return config.registrationDefaultsBuilder(state);
+    }
+    const person = {
+      Email: getInputValueById(config.personFieldIds.email),
+      FirstName: getInputValueById(config.personFieldIds.firstName),
+      LastName: getInputValueById(config.personFieldIds.lastName)
+    };
+    const phone = getInputValueById(config.personFieldIds.phone);
+    if (phone) person.PhoneMobile = phone;
+    return {
+      Person: person,
+      Account: {
+        Name: state.company.name || "",
+        BillingAddress: state.company.address || "",
+        AntalAnsatte: state.company.employees === void 0 || state.company.employees === null ? "" : String(state.company.employees),
+        EAN: getInputValueById(config.invoicingFieldIds.ean),
+        Faktureringsmail: getInputValueById(config.invoicingFieldIds.invoiceEmail)
+      }
+    };
+  }
   function initSignupFlow(userConfig = {}) {
     const config = {
       ...DEFAULT_CONFIG,
@@ -446,10 +487,11 @@ var AnvisningerSignupFlow = (() => {
                 }
                 const planResp = await fetchPlanInfoByEmployees(employees, config);
                 const selected = planResp && planResp.plan ? planResp.plan : null;
-                if (!selected || !selected.planUid) {
+                const planUid = selected?.planUid || selected?.Uid || planResp?.planUid || null;
+                if (!selected || !planUid) {
                   throw new Error("No plan found for employee count.");
                 }
-                state.planUid = selected.planUid;
+                state.planUid = planUid;
                 state.plan = selected;
                 setPlanUI(selected, config);
                 notifyPlanUidChange(config, state.planUid);
@@ -499,6 +541,30 @@ var AnvisningerSignupFlow = (() => {
       );
       const form = sliderEl.closest("form");
       if (form) form.addEventListener("submit", (e) => e.preventDefault());
+      const handOffButton = document.getElementById(config.handOffButtonId);
+      if (handOffButton) {
+        handOffButton.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          showError(config.errorBoxId, "");
+          if (!state.planUid) {
+            showError(config.errorBoxId, "Missing plan selection.");
+            return;
+          }
+          if (!window.Outseta || !window.Outseta.auth || !window.Outseta.auth.open) {
+            showError(config.errorBoxId, "Outseta embed is not available.");
+            return;
+          }
+          const registrationDefaults = buildRegistrationDefaults(config, state);
+          window.Outseta.auth.open({
+            planUid: state.planUid,
+            state: config.outsetaState,
+            registrationDefaults
+          });
+        });
+      } else {
+        console.warn("[Flow] handoff button not found:", config.handOffButtonId);
+      }
       console.log("[Flow] ready", {
         sliderId: config.sliderId,
         worker: config.cvrWorkerUrl,
