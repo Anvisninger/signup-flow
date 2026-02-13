@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "fmt": "prettier -w .",
-    "build:signup-flow": "BUILD_TIME=$(node -e \"process.stdout.write(new Date().toISOString())\") esbuild packages/signup-flow/src/index.js --bundle --format=iife --global-name=AnvisningerSignupFlow --outfile=dist/signup-flow.js --define:__BUILD_TIME__=\\\"$BUILD_TIME\\\""
+    "build:signup-flow": "node scripts/build-signup-flow.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.27.3",
