@@ -259,11 +259,11 @@ function setPlanUI(plan, config) {
   setText(config.outputIds.planName, plan.name || "-");
 
   if (plan.planUid === config.basisPlanUid) {
-    setText(config.outputIds.pricePerYear, "0 kr./aar");
+    setText(config.outputIds.pricePerYear, "0");
     return;
   }
 
-  setText(config.outputIds.pricePerYear, formatDKK(plan.annualRate) + " kr./aar");
+  setText(config.outputIds.pricePerYear, formatDKK(plan.annualRate));
 }
 
 function notifyPlanUidChange(config, planUid) {
