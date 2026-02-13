@@ -23,7 +23,7 @@ var AnvisningerSignupFlow = (() => {
     default: () => index_default,
     initSignupFlow: () => initSignupFlow
   });
-  var BUILD_TIME = true ? "2026-02-13T14:33:19.644Z" : null;
+  var BUILD_TIME = true ? "2026-02-13T14:35:41.674Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -483,7 +483,7 @@ var AnvisningerSignupFlow = (() => {
             e.preventDefault();
             e.stopPropagation();
             showError(config.errorBoxId, "");
-            goToStepWithHistory(sliderEl, stepToIndex, "contact", nav);
+            goToStepWithHistory(sliderEl, stepToIndex, "invoicing", nav);
             return;
           }
           if (currentStep === "company") {

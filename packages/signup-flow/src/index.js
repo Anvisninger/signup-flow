@@ -542,7 +542,7 @@ export function initSignupFlow(userConfig = {}) {
           e.stopPropagation();
 
           showError(config.errorBoxId, "");
-          goToStepWithHistory(sliderEl, stepToIndex, "contact", nav);
+          goToStepWithHistory(sliderEl, stepToIndex, "invoicing", nav);
           return;
         }
 
