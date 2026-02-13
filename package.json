@@ -1,16 +1,14 @@
 {
   "name": "signup-flow",
-  "version": "1.0.0",
-  "main": "index.js",
+  "private": true,
+  "workspaces": [
+    "packages/signup-flow",
+    "packages/workers/*"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "fmt": "prettier -w ."
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "devDependencies": {
-    "eslint": "^10.0.0",
-    "prettier": "^3.8.1"
+    "prettier": "^3.0.0"
   }
 }
