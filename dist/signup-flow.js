@@ -23,6 +23,7 @@ var AnvisningerSignupFlow = (() => {
     default: () => index_default,
     initSignupFlow: () => initSignupFlow
   });
+  var BUILD_TIME = true ? "" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -250,10 +251,10 @@ var AnvisningerSignupFlow = (() => {
     }
     setText(config.outputIds.planName, plan.name || "-");
     if (plan.planUid === config.basisPlanUid) {
-      setText(config.outputIds.pricePerYear, "0 kr./aar");
+      setText(config.outputIds.pricePerYear, "0");
       return;
     }
-    setText(config.outputIds.pricePerYear, formatDKK(plan.annualRate) + " kr./aar");
+    setText(config.outputIds.pricePerYear, formatDKK(plan.annualRate));
   }
   function notifyPlanUidChange(config, planUid) {
     if (typeof config.onPlanUidChange === "function") {
@@ -279,6 +280,11 @@ var AnvisningerSignupFlow = (() => {
       history: [],
       isProgrammaticNav: false
     };
+    if (BUILD_TIME) {
+      console.log("[Flow] build time", BUILD_TIME);
+    } else {
+      console.log("[Flow] build time unknown");
+    }
     withDomReady(() => {
       const sliderEl = document.getElementById(config.sliderId);
       if (!sliderEl) {

@@ -1,3 +1,5 @@
+const BUILD_TIME = typeof __BUILD_TIME__ !== "undefined" ? __BUILD_TIME__ : null;
+
 const DEFAULT_CONFIG = {
   sliderId: "slider-signup",
   cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -293,6 +295,12 @@ export function initSignupFlow(userConfig = {}) {
     history: [],
     isProgrammaticNav: false,
   };
+
+  if (BUILD_TIME) {
+    console.log("[Flow] build time", BUILD_TIME);
+  } else {
+    console.log("[Flow] build time unknown");
+  }
 
   withDomReady(() => {
     const sliderEl = document.getElementById(config.sliderId);
