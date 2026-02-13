@@ -23,7 +23,7 @@ var AnvisningerSignupFlow = (() => {
     default: () => index_default,
     initSignupFlow: () => initSignupFlow
   });
-  var BUILD_TIME = true ? "" : null;
+  var BUILD_TIME = true ? "2026-02-13T14:33:19.644Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -204,10 +204,11 @@ var AnvisningerSignupFlow = (() => {
     showError(errorBoxId, "");
   }
   function nextAfterCVR(state) {
-    if (state.subscriptionType === "paid") return "planReview";
+    if (state.subscriptionType === "paid") return "company";
     return "company";
   }
   function nextAfterCompany(state) {
+    if (state.subscriptionType === "paid") return "planReview";
     if (state.personType === "organisation" && state.subscriptionType === "free") return "contact";
     return "invoicing";
   }
@@ -482,7 +483,7 @@ var AnvisningerSignupFlow = (() => {
             e.preventDefault();
             e.stopPropagation();
             showError(config.errorBoxId, "");
-            goToStepWithHistory(sliderEl, stepToIndex, "company", nav);
+            goToStepWithHistory(sliderEl, stepToIndex, "contact", nav);
             return;
           }
           if (currentStep === "company") {

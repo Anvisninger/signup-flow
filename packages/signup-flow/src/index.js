@@ -204,11 +204,12 @@ function resetFromStep(step, state, nav, errorBoxId) {
 }
 
 function nextAfterCVR(state) {
-  if (state.subscriptionType === "paid") return "planReview";
+  if (state.subscriptionType === "paid") return "company";
   return "company";
 }
 
 function nextAfterCompany(state) {
+  if (state.subscriptionType === "paid") return "planReview";
   if (state.personType === "organisation" && state.subscriptionType === "free") return "contact";
   return "invoicing";
 }
@@ -541,7 +542,7 @@ export function initSignupFlow(userConfig = {}) {
           e.stopPropagation();
 
           showError(config.errorBoxId, "");
-          goToStepWithHistory(sliderEl, stepToIndex, "company", nav);
+          goToStepWithHistory(sliderEl, stepToIndex, "contact", nav);
           return;
         }
 
