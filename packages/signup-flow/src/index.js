@@ -39,6 +39,9 @@ const DEFAULT_CONFIG = {
     ean: "EAN",
     invoiceEmail: "invoiceEmail",
   },
+  discountFieldIds: {
+    couponCode: "rabatKode",
+  },
 };
 
 function withDomReady(fn, useWebflowReady) {
@@ -308,6 +311,18 @@ function buildRegistrationDefaults(config, state) {
   const phone = getInputValueById(config.personFieldIds.phone);
   if (phone) person.PhoneMobile = phone;
 
+  const subscription = {};
+  const couponCode = getInputValueById(config.discountFieldIds.couponCode);
+  if (couponCode) {
+    subscription.DiscountCouponSubscriptions = [
+      {
+        DiscountCoupon: {
+          UniqueIdentifier: couponCode,
+        },
+      },
+    ];
+  }
+
   return {
     Person: person,
     Account: {
@@ -320,6 +335,7 @@ function buildRegistrationDefaults(config, state) {
       EAN: getInputValueById(config.invoicingFieldIds.ean),
       Faktureringsmail: getInputValueById(config.invoicingFieldIds.invoiceEmail),
     },
+    Subscription: subscription,
   };
 }
 
@@ -629,7 +645,16 @@ export function initSignupFlow(userConfig = {}) {
           return;
         }
 
-        const registrationDefaults = buildRegistrationDefaults(config, state);
+        const registrationDefaults = buildRegistrationDefaults(config, state) || {};
+        const personDefaults = registrationDefaults.Person || {};
+        const accountDefaults = registrationDefaults.Account || {};
+
+        registrationDefaults.Person = personDefaults;
+        registrationDefaults.Account = accountDefaults;
+        registrationDefaults.PersonAccount = {
+          Person: personDefaults,
+          Account: accountDefaults,
+        };
 
         window.Outseta.auth.open({
           planUid: state.planUid,
