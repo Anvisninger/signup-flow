@@ -23,7 +23,7 @@ var AnvisningerSignupFlow = (() => {
     default: () => index_default,
     initSignupFlow: () => initSignupFlow
   });
-  var BUILD_TIME = true ? "2026-02-13T14:58:06.160Z" : null;
+  var BUILD_TIME = true ? "2026-02-18T14:52:44.615Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -31,7 +31,9 @@ var AnvisningerSignupFlow = (() => {
     basisPlanUid: "BWzE5N9E",
     cvrInputId: "CVR-input",
     overlayId: "cvr-loading-overlay",
-    errorBoxId: "errorBox",
+    errorBoxId: null,
+    errorBoxIdPrefix: "errorBox-",
+    errorBoxIds: null,
     outputIds: {
       cvr: "CVR",
       name: "companyName",
@@ -61,12 +63,26 @@ var AnvisningerSignupFlow = (() => {
     },
     invoicingFieldIds: {
       ean: "EAN",
-      invoiceEmail: "invoiceEmail"
+      invoiceEmail: "Faktureringsmail"
     },
     discountFieldIds: {
       couponCode: "rabatKode"
-    }
+    },
+    invoicingErrorBoxIds: {
+      email: "errorBox-4_1",
+      ean: "errorBox-4_2",
+      coupon: "errorBox-4_3"
+    },
+    discountWorkerUrl: null,
+    discountValidationTimeoutMs: 12e3
   };
+  var STEP_ORDER = [
+    "privateOrOrganisation",
+    "basisOrPro",
+    "cvr",
+    "invoicing",
+    "contact"
+  ];
   function withDomReady(fn, useWebflowReady) {
     if (useWebflowReady && window.Webflow && Array.isArray(window.Webflow)) {
       window.Webflow.push(fn);
@@ -88,6 +104,47 @@ var AnvisningerSignupFlow = (() => {
     if (!el) return;
     el.textContent = msg || "";
     el.style.display = msg ? "block" : "none";
+  }
+  function getErrorBoxId(config, step) {
+    if (config.errorBoxIds && step && config.errorBoxIds[step]) {
+      return config.errorBoxIds[step];
+    }
+    if (config.errorBoxIdPrefix && step) {
+      const idx = STEP_ORDER.indexOf(step);
+      if (idx >= 0) return `${config.errorBoxIdPrefix}${idx + 1}`;
+    }
+    return config.errorBoxId || null;
+  }
+  function showErrorForStep(config, step, msg) {
+    const id = getErrorBoxId(config, step);
+    if (!id) return;
+    showError(id, msg);
+  }
+  function showErrorForCurrent(sliderEl, config, msg) {
+    const step = getCurrentStep(sliderEl);
+    showErrorForStep(config, step, msg);
+  }
+  function showInvoicingError(config, key, msg) {
+    const id = config.invoicingErrorBoxIds?.[key];
+    if (!id) return;
+    showError(id, msg);
+  }
+  function clearInvoicingErrors(config) {
+    if (!config.invoicingErrorBoxIds) return;
+    Object.values(config.invoicingErrorBoxIds).forEach((id) => showError(id, ""));
+  }
+  function clearAllErrors(config) {
+    if (config.errorBoxIds) {
+      Object.keys(config.errorBoxIds).forEach((step) => {
+        showErrorForStep(config, step, "");
+      });
+      return;
+    }
+    if (config.errorBoxIdPrefix) {
+      STEP_ORDER.forEach((step) => showErrorForStep(config, step, ""));
+      return;
+    }
+    if (config.errorBoxId) showError(config.errorBoxId, "");
   }
   function showOverlay(overlayId, show) {
     const el = document.getElementById(overlayId);
@@ -179,6 +236,12 @@ var AnvisningerSignupFlow = (() => {
     );
     return checked ? checked.value : null;
   }
+  function isValidEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  }
+  function isValidEan(value) {
+    return /^\d{13}$/.test(value);
+  }
   function syncNextArrowRequirement(sliderEl, radios) {
     const step = getCurrentStep(sliderEl);
     if (step === "privateOrOrganisation") {
@@ -191,33 +254,33 @@ var AnvisningerSignupFlow = (() => {
     }
     setRightArrowEnabled(sliderEl, true);
   }
-  function resetAll(state, nav, errorBoxId) {
+  function resetAll(state, nav, config) {
     nav.history = [];
     state.personType = null;
     state.subscriptionType = null;
     state.planUid = null;
     state.plan = null;
     state.company = { cvr: null, name: null, address: null, employees: null };
-    showError(errorBoxId, "");
+    clearAllErrors(config);
   }
-  function resetAfterBasisOrPro(state, nav, errorBoxId) {
+  function resetAfterBasisOrPro(state, nav, config) {
     nav.history = [];
     state.subscriptionType = null;
     state.planUid = null;
     state.plan = null;
     state.company = { cvr: null, name: null, address: null, employees: null };
-    showError(errorBoxId, "");
+    clearAllErrors(config);
   }
-  function resetFromStep(step, state, nav, errorBoxId) {
-    if (step === "privateOrOrganisation") return resetAll(state, nav, errorBoxId);
-    if (step === "basisOrPro") return resetAfterBasisOrPro(state, nav, errorBoxId);
+  function resetFromStep(step, state, nav, config) {
+    if (step === "privateOrOrganisation") return resetAll(state, nav, config);
+    if (step === "basisOrPro") return resetAfterBasisOrPro(state, nav, config);
     if (step === "cvr") {
       nav.history = [];
       state.company = { cvr: null, name: null, address: null, employees: null };
-      showError(errorBoxId, "");
+      showErrorForStep(config, "cvr", "");
       return;
     }
-    showError(errorBoxId, "");
+    showErrorForStep(config, step, "");
   }
   function nextAfterCVR(state) {
     if (state.subscriptionType === "paid") return "company";
@@ -254,6 +317,20 @@ var AnvisningerSignupFlow = (() => {
   async function fetchPlanInfoByEmployees(employees, config) {
     const url = config.planWorkerUrl + "?employees=" + encodeURIComponent(String(employees));
     return fetchWithTimeout(url, config.timeouts.planMs, { headers: { Accept: "application/json" } });
+  }
+  async function validateDiscountCode(code, config) {
+    if (!code) return { valid: true };
+    const baseUrl = config.discountWorkerUrl ? config.discountWorkerUrl : config.planWorkerUrl.replace(/\/plans$/, "/discount-coupons");
+    const url = baseUrl + "?code=" + encodeURIComponent(code);
+    try {
+      const res = await fetchWithTimeout(url, config.discountValidationTimeoutMs, {
+        headers: { Accept: "application/json" }
+      });
+      if (res && res.valid === false) return { valid: false };
+      return { valid: true };
+    } catch (err) {
+      return { valid: false, error: err && err.message ? err.message : null };
+    }
   }
   function formatDKK(n) {
     const num = Number(n);
@@ -351,19 +428,31 @@ var AnvisningerSignupFlow = (() => {
       const stepToIndex = buildStepToIndex(sliderEl);
       document.querySelectorAll('input[type="radio"][name="' + config.radios.privateOrOrg.name + '"]').forEach((r) => {
         r.addEventListener("change", () => {
-          resetAll(state, nav, config.errorBoxId);
+          resetAll(state, nav, config);
           syncNextArrowRequirement(sliderEl, config.radios);
         });
       });
       document.querySelectorAll('input[type="radio"][name="' + config.radios.basisOrPro.name + '"]').forEach((r) => {
         r.addEventListener("change", () => {
-          resetAfterBasisOrPro(state, nav, config.errorBoxId);
+          resetAfterBasisOrPro(state, nav, config);
           syncNextArrowRequirement(sliderEl, config.radios);
         });
       });
       const cvrInput = document.getElementById(config.cvrInputId);
       if (cvrInput) {
-        cvrInput.addEventListener("input", () => showError(config.errorBoxId, ""));
+        cvrInput.addEventListener("input", () => showErrorForStep(config, "cvr", ""));
+      }
+      const invoiceEmailInput = document.getElementById(config.invoicingFieldIds.invoiceEmail);
+      if (invoiceEmailInput) {
+        invoiceEmailInput.addEventListener("input", () => showInvoicingError(config, "email", ""));
+      }
+      const eanInput = document.getElementById(config.invoicingFieldIds.ean);
+      if (eanInput) {
+        eanInput.addEventListener("input", () => showInvoicingError(config, "ean", ""));
+      }
+      const couponInput = document.getElementById(config.discountFieldIds.couponCode);
+      if (couponInput) {
+        couponInput.addEventListener("input", () => showInvoicingError(config, "coupon", ""));
       }
       sliderEl.addEventListener(
         "click",
@@ -383,7 +472,7 @@ var AnvisningerSignupFlow = (() => {
           if (!prevStep) return;
           e.preventDefault();
           e.stopPropagation();
-          resetFromStep(prevStep, state, nav, config.errorBoxId);
+          resetFromStep(prevStep, state, nav, config);
           goToStep(sliderEl, stepToIndex, prevStep, nav);
           setTimeout(() => syncNextArrowRequirement(sliderEl, config.radios), 80);
         },
@@ -401,11 +490,11 @@ var AnvisningerSignupFlow = (() => {
             e.stopPropagation();
             const value = getRadioValueByName(config.radios.privateOrOrg.name);
             if (!value) {
-              showError(config.errorBoxId, "Please select Private or Business.");
+              showErrorForStep(config, currentStep, "Please select Private or Business.");
               setRightArrowEnabled(sliderEl, false);
               return;
             }
-            showError(config.errorBoxId, "");
+            showErrorForStep(config, currentStep, "");
             if (value === "Privat") {
               state.personType = "private";
               state.subscriptionType = "free";
@@ -430,11 +519,11 @@ var AnvisningerSignupFlow = (() => {
             e.stopPropagation();
             const value = getRadioValueByName(config.radios.basisOrPro.name);
             if (!value) {
-              showError(config.errorBoxId, "Please select Basis or Pro.");
+              showErrorForStep(config, currentStep, "Please select Basis or Pro.");
               setRightArrowEnabled(sliderEl, false);
               return;
             }
-            showError(config.errorBoxId, "");
+            showErrorForStep(config, currentStep, "");
             if (value === "Basis") {
               state.subscriptionType = "free";
               state.planUid = config.basisPlanUid;
@@ -460,14 +549,14 @@ var AnvisningerSignupFlow = (() => {
             e.preventDefault();
             e.stopPropagation();
             if (!cvrInput) {
-              showError(config.errorBoxId, "CVR input not found.");
+              showErrorForStep(config, currentStep, "CVR input not found.");
               return;
             }
             if (inFlight) return;
-            showError(config.errorBoxId, "");
+            showErrorForStep(config, currentStep, "");
             const cvr = (cvrInput.value || "").replace(/\s+/g, "");
             if (!/^\d{8}$/.test(cvr)) {
-              showError(config.errorBoxId, "CVR must be 8 digits.");
+              showErrorForStep(config, currentStep, "CVR must be 8 digits.");
               return;
             }
             inFlight = true;
@@ -476,8 +565,9 @@ var AnvisningerSignupFlow = (() => {
             try {
               const data = await fetchCVR(cvr, config);
               if (data.employees == null && state.subscriptionType === "paid") {
-                showError(
-                  config.errorBoxId,
+                showErrorForStep(
+                  config,
+                  currentStep,
                   "Employee count missing. Please contact sales for signup."
                 );
                 return;
@@ -524,8 +614,9 @@ var AnvisningerSignupFlow = (() => {
               goToStepWithHistory(sliderEl, stepToIndex, nextAfterCVR(state), nav);
             } catch (err) {
               console.error("[Flow] CVR/plan lookup failed:", err);
-              showError(
-                config.errorBoxId,
+              showErrorForStep(
+                config,
+                currentStep,
                 err && err.message ? err.message : "Could not fetch details."
               );
             } finally {
@@ -539,16 +630,43 @@ var AnvisningerSignupFlow = (() => {
           if (currentStep === "planReview") {
             e.preventDefault();
             e.stopPropagation();
-            showError(config.errorBoxId, "");
+            showErrorForStep(config, currentStep, "");
             goToStepWithHistory(sliderEl, stepToIndex, "invoicing", nav);
             return;
           }
           if (currentStep === "company") {
             e.preventDefault();
             e.stopPropagation();
-            showError(config.errorBoxId, "");
+            showErrorForStep(config, currentStep, "");
             const nextStep = nextAfterCompany(state);
             goToStepWithHistory(sliderEl, stepToIndex, nextStep, nav);
+            return;
+          }
+          if (currentStep === "invoicing") {
+            e.preventDefault();
+            e.stopPropagation();
+            clearInvoicingErrors(config);
+            const invoiceEmail = getInputValueById(config.invoicingFieldIds.invoiceEmail);
+            const ean = getInputValueById(config.invoicingFieldIds.ean);
+            const coupon = getInputValueById(config.discountFieldIds.couponCode);
+            let hasError = false;
+            if (invoiceEmail && !isValidEmail(invoiceEmail)) {
+              showInvoicingError(config, "email", "Invalid email format.");
+              hasError = true;
+            }
+            if (ean && !isValidEan(ean)) {
+              showInvoicingError(config, "ean", "EAN must be 13 digits.");
+              hasError = true;
+            }
+            if (coupon) {
+              const result = await validateDiscountCode(coupon, config);
+              if (!result.valid) {
+                showInvoicingError(config, "coupon", "Discount code is not valid.");
+                hasError = true;
+              }
+            }
+            if (hasError) return;
+            goToStepWithHistory(sliderEl, stepToIndex, "contact", nav);
             return;
           }
         },
@@ -561,13 +679,13 @@ var AnvisningerSignupFlow = (() => {
         handOffButton.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          showError(config.errorBoxId, "");
+          showErrorForCurrent(sliderEl, config, "");
           if (!state.planUid) {
-            showError(config.errorBoxId, "Missing plan selection.");
+            showErrorForCurrent(sliderEl, config, "Missing plan selection.");
             return;
           }
           if (!window.Outseta || !window.Outseta.auth || !window.Outseta.auth.open) {
-            showError(config.errorBoxId, "Outseta embed is not available.");
+            showErrorForCurrent(sliderEl, config, "Outseta embed is not available.");
             return;
           }
           const registrationDefaults = buildRegistrationDefaults(config, state) || {};
