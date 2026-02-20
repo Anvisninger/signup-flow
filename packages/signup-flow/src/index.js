@@ -41,16 +41,10 @@ const DEFAULT_CONFIG = {
     ean: "EAN",
     invoiceEmail: "Faktureringsmail",
   },
-  discountFieldIds: {
-    couponCode: "rabatKode",
-  },
   invoicingErrorBoxIds: {
     email: "errorBox-4_1",
     ean: "errorBox-4_2",
-    coupon: "errorBox-4_3",
   },
-  discountWorkerUrl: null,
-  discountValidationTimeoutMs: 12000,
 };
 
 const STEP_ORDER = [
@@ -338,25 +332,6 @@ async function fetchPlanInfoByEmployees(employees, config) {
   return fetchWithTimeout(url, config.timeouts.planMs, { headers: { Accept: "application/json" } });
 }
 
-async function validateDiscountCode(code, config) {
-  if (!code) return { valid: true };
-
-  const baseUrl = config.discountWorkerUrl
-    ? config.discountWorkerUrl
-    : config.planWorkerUrl.replace(/\/plans$/, "/discount-coupons");
-  const url = baseUrl + "?code=" + encodeURIComponent(code);
-
-  try {
-    const res = await fetchWithTimeout(url, config.discountValidationTimeoutMs, {
-      headers: { Accept: "application/json" },
-    });
-    if (res && res.valid === false) return { valid: false };
-    return { valid: true };
-  } catch (err) {
-    return { valid: false, error: err && err.message ? err.message : null };
-  }
-}
-
 function formatDKK(n) {
   const num = Number(n);
   if (!Number.isFinite(num)) return "-";
@@ -406,18 +381,6 @@ function buildRegistrationDefaults(config, state) {
   const phone = getInputValueById(config.personFieldIds.phone);
   if (phone) person.PhoneMobile = phone;
 
-  const subscription = {};
-  const couponCode = getInputValueById(config.discountFieldIds.couponCode);
-  if (couponCode) {
-    subscription.DiscountCouponSubscriptions = [
-      {
-        DiscountCoupon: {
-          UniqueIdentifier: couponCode,
-        },
-      },
-    ];
-  }
-
   return {
     Person: person,
     Account: {
@@ -430,7 +393,6 @@ function buildRegistrationDefaults(config, state) {
       EAN: getInputValueById(config.invoicingFieldIds.ean),
       Faktureringsmail: getInputValueById(config.invoicingFieldIds.invoiceEmail),
     },
-    Subscription: subscription,
   };
 }
 
@@ -502,11 +464,6 @@ export function initSignupFlow(userConfig = {}) {
     const eanInput = document.getElementById(config.invoicingFieldIds.ean);
     if (eanInput) {
       eanInput.addEventListener("input", () => showInvoicingError(config, "ean", ""));
-    }
-
-    const couponInput = document.getElementById(config.discountFieldIds.couponCode);
-    if (couponInput) {
-      couponInput.addEventListener("input", () => showInvoicingError(config, "coupon", ""));
     }
 
     sliderEl.addEventListener(
@@ -741,8 +698,6 @@ export function initSignupFlow(userConfig = {}) {
 
           const invoiceEmail = getInputValueById(config.invoicingFieldIds.invoiceEmail);
           const ean = getInputValueById(config.invoicingFieldIds.ean);
-          const coupon = getInputValueById(config.discountFieldIds.couponCode);
-
           let hasError = false;
 
           if (invoiceEmail && !isValidEmail(invoiceEmail)) {
@@ -753,14 +708,6 @@ export function initSignupFlow(userConfig = {}) {
           if (ean && !isValidEan(ean)) {
             showInvoicingError(config, "ean", "EAN must be 13 digits.");
             hasError = true;
-          }
-
-          if (coupon) {
-            const result = await validateDiscountCode(coupon, config);
-            if (!result.valid) {
-              showInvoicingError(config, "coupon", "Discount code is not valid.");
-              hasError = true;
-            }
           }
 
           if (hasError) return;
