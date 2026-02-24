@@ -16,10 +16,6 @@ export default {
       return handlePlans(url, env, corsHeaders);
     }
 
-    if (url.pathname === "/discount-coupons") {
-      return handleDiscountCoupons(url, env, corsHeaders);
-    }
-
     return new Response("Not found", { status: 404, headers: corsHeaders });
   },
 };
@@ -105,59 +101,6 @@ async function handlePlans(url, env, corsHeaders) {
       planFamilyName,
       plans,
       ...(employees != null ? { employees, plan: selectedPlan } : {}),
-    },
-    200,
-    corsHeaders
-  );
-}
-
-async function handleDiscountCoupons(url, env, corsHeaders) {
-  const codeParam = url.searchParams.get("code");
-  const code = (codeParam || "").trim();
-
-  if (!code) {
-    return json({ error: "Missing code parameter" }, 400, corsHeaders);
-  }
-
-  const endpoint = "https://anvisninger.outseta.com/api/v1/billing/discountcoupons";
-  const res = await fetchOutseta(endpoint, env);
-
-  if (!res.ok) {
-    const text = await res.text();
-    return json(
-      { error: `Outseta error (${res.status})`, details: text.slice(0, 500) },
-      res.status,
-      corsHeaders
-    );
-  }
-
-  const raw = await res.json();
-  const items = raw?.items || [];
-  const normalized = code.toLowerCase();
-  const match = items.find(
-    (item) => (item?.UniqueIdentifier || "").toLowerCase() === normalized
-  );
-
-  if (!match || match?.IsActive === false) {
-    return json(
-      { error: "Invalid or inactive discount code", valid: false, code },
-      404,
-      corsHeaders
-    );
-  }
-
-  return json(
-    {
-      valid: true,
-      code,
-      coupon: {
-        uid: match?.Uid ?? null,
-        name: match?.Name ?? null,
-        uniqueIdentifier: match?.UniqueIdentifier ?? null,
-        isActive: match?.IsActive ?? null,
-        percentOff: match?.PercentOff ?? null,
-        amountOff: match?.AmountOff ?? null,
-      },
     },
     200,
     corsHeaders

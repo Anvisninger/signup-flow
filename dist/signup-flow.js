@@ -23,7 +23,7 @@ var AnvisningerSignupFlow = (() => {
     default: () => index_default,
     initSignupFlow: () => initSignupFlow
   });
-  var BUILD_TIME = true ? "2026-02-20T14:16:21.525Z" : null;
+  var BUILD_TIME = true ? "2026-02-24T13:12:50.074Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -43,7 +43,7 @@ var AnvisningerSignupFlow = (() => {
       pricePerYear: "pricePerYear"
     },
     radios: {
-      privateOrOrg: { name: "privateOrOrganisation", values: ["Privat", "Erhverv"] },
+      customerType: { name: "customerType", values: ["Privat", "Erhverv", "Offentlig", "Uddannelse"] },
       basisOrPro: { name: "basisOrPro", values: ["Basis", "Pro"] }
     },
     timeouts: {
@@ -71,10 +71,13 @@ var AnvisningerSignupFlow = (() => {
     }
   };
   var STEP_ORDER = [
-    "privateOrOrganisation",
+    "customerType",
     "basisOrPro",
     "cvr",
+    "company",
+    "planReview",
     "invoicing",
+    "contactSales",
     "contact"
   ];
   function withDomReady(fn, useWebflowReady) {
@@ -238,12 +241,16 @@ var AnvisningerSignupFlow = (() => {
   }
   function syncNextArrowRequirement(sliderEl, radios) {
     const step = getCurrentStep(sliderEl);
-    if (step === "privateOrOrganisation") {
-      setRightArrowEnabled(sliderEl, !!getRadioValueByName(radios.privateOrOrg.name));
+    if (step === "customerType") {
+      setRightArrowEnabled(sliderEl, !!getRadioValueByName(radios.customerType.name));
       return;
     }
     if (step === "basisOrPro") {
       setRightArrowEnabled(sliderEl, !!getRadioValueByName(radios.basisOrPro.name));
+      return;
+    }
+    if (step === "contactSales") {
+      setRightArrowEnabled(sliderEl, false);
       return;
     }
     setRightArrowEnabled(sliderEl, true);
@@ -266,7 +273,7 @@ var AnvisningerSignupFlow = (() => {
     clearAllErrors(config);
   }
   function resetFromStep(step, state, nav, config) {
-    if (step === "privateOrOrganisation") return resetAll(state, nav, config);
+    if (step === "customerType") return resetAll(state, nav, config);
     if (step === "basisOrPro") return resetAfterBasisOrPro(state, nav, config);
     if (step === "cvr") {
       nav.history = [];
@@ -394,7 +401,7 @@ var AnvisningerSignupFlow = (() => {
         return;
       }
       const stepToIndex = buildStepToIndex(sliderEl);
-      document.querySelectorAll('input[type="radio"][name="' + config.radios.privateOrOrg.name + '"]').forEach((r) => {
+      document.querySelectorAll('input[type="radio"][name="' + config.radios.customerType.name + '"]').forEach((r) => {
         r.addEventListener("change", () => {
           resetAll(state, nav, config);
           syncNextArrowRequirement(sliderEl, config.radios);
@@ -432,13 +439,19 @@ var AnvisningerSignupFlow = (() => {
           const backArrow = e.target.closest(".w-slider-arrow-left");
           if (!backArrow) return;
           if (nav.isProgrammaticNav) return;
+          const currentStep = getCurrentStep(sliderEl);
           const prevStep = nav.history.pop();
           if (!prevStep) return;
           e.preventDefault();
           e.stopPropagation();
-          resetFromStep(prevStep, state, nav, config);
-          goToStep(sliderEl, stepToIndex, prevStep, nav);
-          setTimeout(() => syncNextArrowRequirement(sliderEl, config.radios), 80);
+          if (currentStep === "contactSales" && prevStep === "customerType") {
+            goToStep(sliderEl, stepToIndex, prevStep, nav);
+            setTimeout(() => syncNextArrowRequirement(sliderEl, config.radios), 80);
+          } else {
+            resetFromStep(prevStep, state, nav, config);
+            goToStep(sliderEl, stepToIndex, prevStep, nav);
+            setTimeout(() => syncNextArrowRequirement(sliderEl, config.radios), 80);
+          }
         },
         true
       );
@@ -449,12 +462,12 @@ var AnvisningerSignupFlow = (() => {
           const nextArrow = e.target.closest(".w-slider-arrow-right");
           if (!nextArrow) return;
           const currentStep = getCurrentStep(sliderEl);
-          if (currentStep === "privateOrOrganisation") {
+          if (currentStep === "customerType") {
             e.preventDefault();
             e.stopPropagation();
-            const value = getRadioValueByName(config.radios.privateOrOrg.name);
+            const value = getRadioValueByName(config.radios.customerType.name);
             if (!value) {
-              showErrorForStep(config, currentStep, "Please select Private or Business.");
+              showErrorForStep(config, currentStep, "Please select a customer type.");
               setRightArrowEnabled(sliderEl, false);
               return;
             }
@@ -472,9 +485,12 @@ var AnvisningerSignupFlow = (() => {
               setPlanUI(state.plan, config);
               notifyPlanUidChange(config, state.planUid);
               goToStepWithHistory(sliderEl, stepToIndex, "contact", nav);
-            } else {
+            } else if (value === "Erhverv") {
               state.personType = "organisation";
               goToStepWithHistory(sliderEl, stepToIndex, "basisOrPro", nav);
+            } else if (value === "Offentlig" || value === "Uddannelse") {
+              state.personType = value.toLowerCase();
+              goToStepWithHistory(sliderEl, stepToIndex, "contactSales", nav);
             }
             return;
           }
@@ -604,6 +620,11 @@ var AnvisningerSignupFlow = (() => {
             showErrorForStep(config, currentStep, "");
             const nextStep = nextAfterCompany(state);
             goToStepWithHistory(sliderEl, stepToIndex, nextStep, nav);
+            return;
+          }
+          if (currentStep === "contactSales") {
+            e.preventDefault();
+            e.stopPropagation();
             return;
           }
           if (currentStep === "invoicing") {
