@@ -23,7 +23,63 @@ var AnvisningerSignupFlow = (() => {
     default: () => index_default,
     initSignupFlow: () => initSignupFlow
   });
-  var BUILD_TIME = true ? "2026-02-24T13:12:50.074Z" : null;
+
+  // packages/signup-flow/src/ga-tracking.js
+  function generateTransactionId() {
+    const now = /* @__PURE__ */ new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const dateStr = `${year}${month}${day}`;
+    const uid = Array.from(
+      { length: 8 },
+      () => Math.floor(Math.random() * 16).toString(16)
+    ).join("");
+    return `ANV-${dateStr}-${uid}`;
+  }
+  function pushGAPurchaseEvent(config, state) {
+    if (!config.gaConfig || !config.gaConfig.trackPurchase) return;
+    if (!state.plan || !state.plan.annualRate) return;
+    window.dataLayer = window.dataLayer || [];
+    const plan = state.plan;
+    const transactionId = generateTransactionId();
+    const affiliation = config.gaConfig.companyName || "Anvisninger.dk";
+    const itemCategory = config.gaConfig.itemCategory || "Abonnement";
+    const itemId = plan.planUid || "PLAN_UID_IKKE_FUNDET";
+    const itemName = plan.name || "PLAN_NAVN_IKKE_FUNDET";
+    const price = Math.round(plan.annualRate);
+    const currency = "DKK";
+    window.dataLayer.push({
+      event: "purchase",
+      ecommerce: {
+        transaction_id: transactionId,
+        affiliation,
+        value: price,
+        currency,
+        items: [
+          {
+            item_id: itemId,
+            item_name: itemName,
+            affiliation,
+            item_category: itemCategory,
+            item_brand: affiliation,
+            price,
+            quantity: 1
+          }
+        ]
+      }
+    });
+  }
+  function setupOutsetaCompletionTracking(config, state) {
+    if (!config.gaConfig || !config.gaConfig.trackPurchase) return;
+    if (!window.Outseta || typeof window.Outseta.on !== "function") return;
+    window.Outseta.on("signup", (account) => {
+      pushGAPurchaseEvent(config, state);
+    });
+  }
+
+  // packages/signup-flow/src/index.js
+  var BUILD_TIME = true ? "2026-02-24T14:24:19.431Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -31,8 +87,6 @@ var AnvisningerSignupFlow = (() => {
     basisPlanUid: "BWzE5N9E",
     cvrInputId: "CVR-input",
     overlayId: "cvr-loading-overlay",
-    errorBoxId: null,
-    errorBoxIdPrefix: "errorBox-",
     errorBoxIds: null,
     outputIds: {
       cvr: "CVR",
@@ -52,22 +106,25 @@ var AnvisningerSignupFlow = (() => {
     },
     useWebflowReady: true,
     onPlanUidChange: null,
-    handOffButtonId: "handOffOutseta",
+    handOffButtonId: "hand-off-outseta",
     outsetaState: "checkout",
     registrationDefaultsBuilder: null,
     personFieldIds: {
-      email: "Email",
-      firstName: "firstName",
-      lastName: "lastName",
-      phone: "phoneNumber"
+      email: "email",
+      firstName: "first-name",
+      lastName: "last-name",
+      phone: "phone-number"
     },
+    emailCheckWorkerUrl: null,
+    emailCheckTimeoutMs: 8e3,
     invoicingFieldIds: {
       ean: "EAN",
       invoiceEmail: "Faktureringsmail"
     },
-    invoicingErrorBoxIds: {
-      email: "errorBox-4_1",
-      ean: "errorBox-4_2"
+    gaConfig: {
+      companyName: "Anvisninger",
+      itemCategory: "Abonnement",
+      trackPurchase: true
     }
   };
   var STEP_ORDER = [
@@ -102,15 +159,22 @@ var AnvisningerSignupFlow = (() => {
     el.textContent = msg || "";
     el.style.display = msg ? "block" : "none";
   }
-  function getErrorBoxId(config, step) {
+  function toKebabCase(str) {
+    return str.replace(/([a-z])([A-Z])/g, "$1-$2").replace(/[\s_]+/g, "-").toLowerCase();
+  }
+  function getErrorBoxId(config, step, fieldId = null) {
     if (config.errorBoxIds && step && config.errorBoxIds[step]) {
       return config.errorBoxIds[step];
     }
-    if (config.errorBoxIdPrefix && step) {
-      const idx = STEP_ORDER.indexOf(step);
-      if (idx >= 0) return `${config.errorBoxIdPrefix}${idx + 1}`;
+    if (step) {
+      const stepKebab = toKebabCase(step);
+      if (fieldId) {
+        const fieldKebab = toKebabCase(fieldId);
+        return `errorbox-${stepKebab}-${fieldKebab}`;
+      }
+      return `errorbox-${stepKebab}`;
     }
-    return config.errorBoxId || null;
+    return null;
   }
   function showErrorForStep(config, step, msg) {
     const id = getErrorBoxId(config, step);
@@ -121,27 +185,26 @@ var AnvisningerSignupFlow = (() => {
     const step = getCurrentStep(sliderEl);
     showErrorForStep(config, step, msg);
   }
-  function showInvoicingError(config, key, msg) {
-    const id = config.invoicingErrorBoxIds?.[key];
+  function showInvoicingError(config, fieldKey, msg) {
+    const fieldIdMap = {
+      email: config.invoicingFieldIds.invoiceEmail,
+      ean: config.invoicingFieldIds.ean
+    };
+    const fieldId = fieldIdMap[fieldKey] || fieldKey;
+    const id = getErrorBoxId(config, "invoicing", fieldId);
     if (!id) return;
     showError(id, msg);
   }
   function clearInvoicingErrors(config) {
-    if (!config.invoicingErrorBoxIds) return;
-    Object.values(config.invoicingErrorBoxIds).forEach((id) => showError(id, ""));
+    showInvoicingError(config, "email", "");
+    showInvoicingError(config, "ean", "");
   }
   function clearAllErrors(config) {
-    if (config.errorBoxIds) {
-      Object.keys(config.errorBoxIds).forEach((step) => {
-        showErrorForStep(config, step, "");
-      });
-      return;
-    }
-    if (config.errorBoxIdPrefix) {
-      STEP_ORDER.forEach((step) => showErrorForStep(config, step, ""));
-      return;
-    }
-    if (config.errorBoxId) showError(config.errorBoxId, "");
+    STEP_ORDER.forEach((step) => showErrorForStep(config, step, ""));
+    clearInvoicingErrors(config);
+    showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
+    showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "");
+    showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "");
   }
   function showOverlay(overlayId, show) {
     const el = document.getElementById(overlayId);
@@ -319,6 +382,20 @@ var AnvisningerSignupFlow = (() => {
     const url = config.planWorkerUrl + "?employees=" + encodeURIComponent(String(employees));
     return fetchWithTimeout(url, config.timeouts.planMs, { headers: { Accept: "application/json" } });
   }
+  async function checkEmailExists(email, config) {
+    if (!email || !isValidEmail(email)) return { exists: false };
+    const baseUrl = config.emailCheckWorkerUrl ? config.emailCheckWorkerUrl : config.planWorkerUrl.replace(/\/plans$/, "/check-email");
+    const url = baseUrl + "?email=" + encodeURIComponent(email);
+    try {
+      const res = await fetchWithTimeout(url, config.emailCheckTimeoutMs, {
+        headers: { Accept: "application/json" }
+      });
+      return res;
+    } catch (err) {
+      console.error("[Flow] email check failed:", err);
+      return { exists: false, error: err && err.message ? err.message : null };
+    }
+  }
   function formatDKK(n) {
     const num = Number(n);
     if (!Number.isFinite(num)) return "-";
@@ -376,7 +453,8 @@ var AnvisningerSignupFlow = (() => {
       ...userConfig,
       outputIds: { ...DEFAULT_CONFIG.outputIds, ...userConfig.outputIds || {} },
       radios: { ...DEFAULT_CONFIG.radios, ...userConfig.radios || {} },
-      timeouts: { ...DEFAULT_CONFIG.timeouts, ...userConfig.timeouts || {} }
+      timeouts: { ...DEFAULT_CONFIG.timeouts, ...userConfig.timeouts || {} },
+      gaConfig: { ...DEFAULT_CONFIG.gaConfig, ...userConfig.gaConfig || {} }
     };
     const state = {
       personType: null,
@@ -416,6 +494,34 @@ var AnvisningerSignupFlow = (() => {
       const cvrInput = document.getElementById(config.cvrInputId);
       if (cvrInput) {
         cvrInput.addEventListener("input", () => showErrorForStep(config, "cvr", ""));
+      }
+      const emailInput = document.getElementById(config.personFieldIds.email);
+      if (emailInput) {
+        emailInput.addEventListener("blur", async () => {
+          const email = (emailInput.value || "").trim();
+          if (!email) {
+            showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
+            return;
+          }
+          const result = await checkEmailExists(email, config);
+          if (result.exists) {
+            showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "This email is already registered. Please use another email address or contact our support.");
+          } else {
+            showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
+          }
+        });
+      }
+      const firstNameInput = document.getElementById(config.personFieldIds.firstName);
+      if (firstNameInput) {
+        firstNameInput.addEventListener("input", () => {
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "");
+        });
+      }
+      const lastNameInput = document.getElementById(config.personFieldIds.lastName);
+      if (lastNameInput) {
+        lastNameInput.addEventListener("input", () => {
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "");
+        });
       }
       const invoiceEmailInput = document.getElementById(config.invoicingFieldIds.invoiceEmail);
       if (invoiceEmailInput) {
@@ -661,6 +767,23 @@ var AnvisningerSignupFlow = (() => {
             showErrorForCurrent(sliderEl, config, "Missing plan selection.");
             return;
           }
+          const firstName = getInputValueById(config.personFieldIds.firstName);
+          const lastName = getInputValueById(config.personFieldIds.lastName);
+          const email = getInputValueById(config.personFieldIds.email);
+          let hasError = false;
+          if (!firstName) {
+            showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "First name is required.");
+            hasError = true;
+          }
+          if (!lastName) {
+            showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "Last name is required.");
+            hasError = true;
+          }
+          if (!email || !isValidEmail(email)) {
+            showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "Valid email is required.");
+            hasError = true;
+          }
+          if (hasError) return;
           if (!window.Outseta || !window.Outseta.auth || !window.Outseta.auth.open) {
             showErrorForCurrent(sliderEl, config, "Outseta embed is not available.");
             return;
@@ -679,6 +802,7 @@ var AnvisningerSignupFlow = (() => {
             state: config.outsetaState,
             registrationDefaults
           });
+          setupOutsetaCompletionTracking(config, state);
         });
       } else {
         console.warn("[Flow] handoff button not found:", config.handOffButtonId);

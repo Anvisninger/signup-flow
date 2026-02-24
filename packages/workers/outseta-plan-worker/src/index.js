@@ -16,6 +16,10 @@ export default {
       return handlePlans(url, env, corsHeaders);
     }
 
+    if (url.pathname === "/check-email") {
+      return handleCheckEmail(url, env, corsHeaders);
+    }
+
     return new Response("Not found", { status: 404, headers: corsHeaders });
   },
 };
@@ -101,6 +105,45 @@ async function handlePlans(url, env, corsHeaders) {
       planFamilyName,
       plans,
       ...(employees != null ? { employees, plan: selectedPlan } : {}),
+    },
+    200,
+    corsHeaders
+  );
+}
+
+async function handleCheckEmail(url, env, corsHeaders) {
+  const emailParam = url.searchParams.get("email");
+  const email = (emailParam || "").trim();
+
+  if (!email) {
+    return json({ error: "Missing email parameter" }, 400, corsHeaders);
+  }
+
+  // Query Outseta for person with this email
+  const endpoint = `https://anvisninger.outseta.com/api/v1/crm/people?email=${encodeURIComponent(email)}`;
+
+  const res = await fetchOutseta(endpoint, env);
+
+  if (!res.ok) {
+    const text = await res.text();
+    return json(
+      { error: `Outseta error (${res.status})`, details: text.slice(0, 500) },
+      res.status,
+      corsHeaders
+    );
+  }
+
+  const raw = await res.json();
+  const people = raw?.items || [];
+
+  // If any person with this email exists, it's taken
+  const exists = people.length > 0;
+
+  return json(
+    {
+      email,
+      exists,
+      message: exists ? "Email address is already registered" : "Email is available",
     },
     200,
     corsHeaders

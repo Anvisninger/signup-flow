@@ -1,5 +1,14 @@
 const BUILD_TIME = typeof __BUILD_TIME__ !== "undefined" ? __BUILD_TIME__ : null;
 
+import { generateTransactionId, pushGAPurchaseEvent, setupOutsetaCompletionTracking } from "./ga-tracking.js";
+
+// TODO: Convert remaining IDs to kebab-case for Client-First compliance:
+// - cvrInputId: "CVR-input" → "cvr-input"
+// - outputIds: "CVR" → "cvr", "companyName" → "company-name", etc.
+// - radios.customerType.name: "customerType" → "customer-type"
+// - radios.basisOrPro.name: "basisOrPro" → "basis-or-pro"
+// - invoicingFieldIds: "EAN" → "ean", "Faktureringsmail" → "faktureringsmail"
+
 const DEFAULT_CONFIG = {
   sliderId: "slider-signup",
   cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -7,8 +16,6 @@ const DEFAULT_CONFIG = {
   basisPlanUid: "BWzE5N9E",
   cvrInputId: "CVR-input",
   overlayId: "cvr-loading-overlay",
-  errorBoxId: null,
-  errorBoxIdPrefix: "errorBox-",
   errorBoxIds: null,
   outputIds: {
     cvr: "CVR",
@@ -28,22 +35,25 @@ const DEFAULT_CONFIG = {
   },
   useWebflowReady: true,
   onPlanUidChange: null,
-  handOffButtonId: "handOffOutseta",
+  handOffButtonId: "hand-off-outseta",
   outsetaState: "checkout",
   registrationDefaultsBuilder: null,
   personFieldIds: {
-    email: "Email",
-    firstName: "firstName",
-    lastName: "lastName",
-    phone: "phoneNumber",
+    email: "email",
+    firstName: "first-name",
+    lastName: "last-name",
+    phone: "phone-number",
   },
+  emailCheckWorkerUrl: null,
+  emailCheckTimeoutMs: 8000,
   invoicingFieldIds: {
     ean: "EAN",
     invoiceEmail: "Faktureringsmail",
   },
-  invoicingErrorBoxIds: {
-    email: "errorBox-4_1",
-    ean: "errorBox-4_2",
+  gaConfig: {
+    companyName: "Anvisninger",
+    itemCategory: "Abonnement",
+    trackPurchase: true,
   },
 };
 
@@ -85,17 +95,31 @@ function showError(errorBoxId, msg) {
   el.style.display = msg ? "block" : "none";
 }
 
-function getErrorBoxId(config, step) {
+function toKebabCase(str) {
+  return str
+    .replace(/([a-z])([A-Z])/g, "$1-$2") // camelCase to kebab-case
+    .replace(/[\s_]+/g, "-") // spaces and underscores to hyphens
+    .toLowerCase();
+}
+
+function getErrorBoxId(config, step, fieldId = null) {
+  // Allow custom override via errorBoxIds
   if (config.errorBoxIds && step && config.errorBoxIds[step]) {
     return config.errorBoxIds[step];
   }
 
-  if (config.errorBoxIdPrefix && step) {
-    const idx = STEP_ORDER.indexOf(step);
-    if (idx >= 0) return `${config.errorBoxIdPrefix}${idx + 1}`;
+  // Generate ID from step and optional field: errorbox-{step}-{field} or errorbox-{step}
+  // Using lowercase kebab-case following Client-First conventions
+  if (step) {
+    const stepKebab = toKebabCase(step);
+    if (fieldId) {
+      const fieldKebab = toKebabCase(fieldId);
+      return `errorbox-${stepKebab}-${fieldKebab}`;
+    }
+    return `errorbox-${stepKebab}`;
   }
 
-  return config.errorBoxId || null;
+  return null;
 }
 
 function showErrorForStep(config, step, msg) {
@@ -109,31 +133,33 @@ function showErrorForCurrent(sliderEl, config, msg) {
   showErrorForStep(config, step, msg);
 }
 
-function showInvoicingError(config, key, msg) {
-  const id = config.invoicingErrorBoxIds?.[key];
+function showInvoicingError(config, fieldKey, msg) {
+  // Map friendly keys to actual field IDs
+  const fieldIdMap = {
+    email: config.invoicingFieldIds.invoiceEmail,
+    ean: config.invoicingFieldIds.ean,
+  };
+  const fieldId = fieldIdMap[fieldKey] || fieldKey;
+  const id = getErrorBoxId(config, "invoicing", fieldId);
   if (!id) return;
   showError(id, msg);
 }
 
 function clearInvoicingErrors(config) {
-  if (!config.invoicingErrorBoxIds) return;
-  Object.values(config.invoicingErrorBoxIds).forEach((id) => showError(id, ""));
+  // Clear both invoicing field errors
+  showInvoicingError(config, "email", "");
+  showInvoicingError(config, "ean", "");
 }
 
 function clearAllErrors(config) {
-  if (config.errorBoxIds) {
-    Object.keys(config.errorBoxIds).forEach((step) => {
-      showErrorForStep(config, step, "");
-    });
-    return;
-  }
-
-  if (config.errorBoxIdPrefix) {
-    STEP_ORDER.forEach((step) => showErrorForStep(config, step, ""));
-    return;
-  }
-
-  if (config.errorBoxId) showError(config.errorBoxId, "");
+  // Clear general step errors
+  STEP_ORDER.forEach((step) => showErrorForStep(config, step, ""));
+  
+  // Clear specific field errors
+  clearInvoicingErrors(config);
+  showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
+  showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "");
+  showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "");
 }
 
 function showOverlay(overlayId, show) {
@@ -348,6 +374,25 @@ async function fetchPlanInfoByEmployees(employees, config) {
   return fetchWithTimeout(url, config.timeouts.planMs, { headers: { Accept: "application/json" } });
 }
 
+async function checkEmailExists(email, config) {
+  if (!email || !isValidEmail(email)) return { exists: false };
+
+  const baseUrl = config.emailCheckWorkerUrl
+    ? config.emailCheckWorkerUrl
+    : config.planWorkerUrl.replace(/\/plans$/, "/check-email");
+  const url = baseUrl + "?email=" + encodeURIComponent(email);
+
+  try {
+    const res = await fetchWithTimeout(url, config.emailCheckTimeoutMs, {
+      headers: { Accept: "application/json" },
+    });
+    return res;
+  } catch (err) {
+    console.error("[Flow] email check failed:", err);
+    return { exists: false, error: err && err.message ? err.message : null };
+  }
+}
+
 function formatDKK(n) {
   const num = Number(n);
   if (!Number.isFinite(num)) return "-";
@@ -419,6 +464,7 @@ export function initSignupFlow(userConfig = {}) {
     outputIds: { ...DEFAULT_CONFIG.outputIds, ...(userConfig.outputIds || {}) },
     radios: { ...DEFAULT_CONFIG.radios, ...(userConfig.radios || {}) },
     timeouts: { ...DEFAULT_CONFIG.timeouts, ...(userConfig.timeouts || {}) },
+    gaConfig: { ...DEFAULT_CONFIG.gaConfig, ...(userConfig.gaConfig || {}) },
   };
 
   const state = {
@@ -470,6 +516,38 @@ export function initSignupFlow(userConfig = {}) {
     const cvrInput = document.getElementById(config.cvrInputId);
     if (cvrInput) {
       cvrInput.addEventListener("input", () => showErrorForStep(config, "cvr", ""));
+    }
+
+    const emailInput = document.getElementById(config.personFieldIds.email);
+    if (emailInput) {
+      emailInput.addEventListener("blur", async () => {
+        const email = (emailInput.value || "").trim();
+        if (!email) {
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
+          return;
+        }
+
+        const result = await checkEmailExists(email, config);
+        if (result.exists) {
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "This email is already registered. Please use another email address or contact our support.");
+        } else {
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
+        }
+      });
+    }
+
+    const firstNameInput = document.getElementById(config.personFieldIds.firstName);
+    if (firstNameInput) {
+      firstNameInput.addEventListener("input", () => {
+        showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "");
+      });
+    }
+
+    const lastNameInput = document.getElementById(config.personFieldIds.lastName);
+    if (lastNameInput) {
+      lastNameInput.addEventListener("input", () => {
+        showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "");
+      });
     }
 
     const invoiceEmailInput = document.getElementById(config.invoicingFieldIds.invoiceEmail);
@@ -767,6 +845,30 @@ export function initSignupFlow(userConfig = {}) {
           return;
         }
 
+        // Validate required contact fields
+        const firstName = getInputValueById(config.personFieldIds.firstName);
+        const lastName = getInputValueById(config.personFieldIds.lastName);
+        const email = getInputValueById(config.personFieldIds.email);
+
+        let hasError = false;
+
+        if (!firstName) {
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "First name is required.");
+          hasError = true;
+        }
+
+        if (!lastName) {
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "Last name is required.");
+          hasError = true;
+        }
+
+        if (!email || !isValidEmail(email)) {
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "Valid email is required.");
+          hasError = true;
+        }
+
+        if (hasError) return;
+
         if (!window.Outseta || !window.Outseta.auth || !window.Outseta.auth.open) {
           showErrorForCurrent(sliderEl, config, "Outseta embed is not available.");
           return;
@@ -788,6 +890,9 @@ export function initSignupFlow(userConfig = {}) {
           state: config.outsetaState,
           registrationDefaults,
         });
+
+        // Track GA purchase event when registration completes
+        setupOutsetaCompletionTracking(config, state);
       });
     } else {
       console.warn("[Flow] handoff button not found:", config.handOffButtonId);
