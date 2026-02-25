@@ -163,9 +163,10 @@ async function handleCheckEmail(url, env, corsHeaders) {
   if (people.length > 0) {
     const person = people[0];
     // PersonAccount is an array of PersonAccount objects
-    // Check if any PersonAccount has an Account with a Uid
+    // A non-empty PersonAccount array means the person is linked to an account
+    // Note: Account object inside PersonAccount may be null even when link exists
     const personAccounts = Array.isArray(person?.PersonAccount) ? person.PersonAccount : [];
-    const hasAccount = personAccounts.some(pa => pa?.Account?.Uid);
+    const hasAccount = personAccounts.length > 0;
     exists = !!hasAccount;
   }
 
