@@ -172,6 +172,7 @@ function buildOutsetaAddress(a) {
     City: a.postdistrikt || "",
     State: "",
     PostalCode: a.postnummer ? String(a.postnummer) : "",
+    Country: "Denmark",
   };
 }
 
