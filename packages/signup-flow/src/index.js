@@ -530,12 +530,12 @@ function buildRegistrationDefaults(config, state) {
   const cvr = state.company.cvr;
   if (cvr) account.CVR_VAT = cvr;
   
-  const address = state.company.address;
-  if (address) account.BillingAddress = address;
-  
+  const addressObject = state.company.addressObject;
+  if (addressObject) account.BillingAddress = addressObject;
+
   const employees = state.company.employees;
   if (employees !== undefined && employees !== null) {
-    account.AntalAnsatte = String(employees);
+    account.AntalAnsatte = Number(employees);
   }
   
   const ean = getInputValueById(config.invoicingFieldIds.ean);
@@ -799,6 +799,7 @@ export function initSignupFlow(userConfig = {}) {
               cvr: data.cvr || cvr,
               name: data.name || null,
               address: data.address || null,
+              addressObject: data.addressObject || null,
               employees: data.employees === undefined ? null : data.employees,
             };
 

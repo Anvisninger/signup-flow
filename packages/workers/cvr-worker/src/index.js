@@ -101,6 +101,7 @@ export default {
       null;
 
     const address = formatDkAddress(addr);
+    const addressObject = buildOutsetaAddress(addr);
 
     // Employees + source (stable, explicit)
     const monthly = meta?.nyesteMaanedsbeskaeftigelse?.antalAnsatte;
@@ -125,6 +126,7 @@ export default {
       cvr,
       name,
       address,
+      addressObject,
       employees,
       employeesSource,
       ...(debug
@@ -158,6 +160,20 @@ export default {
     return response;
   },
 };
+
+function buildOutsetaAddress(a) {
+  if (!a) return null;
+  const street = [a.vejnavn, a.husnummerFra ?? a.husnummer, a.bogstavFra].filter(Boolean).join(" ");
+  const floorDoor = [a.etage ? `${a.etage}.` : null, a.sidedoer].filter(Boolean).join(" ");
+  const line1 = [street, floorDoor].filter(Boolean).join(", ") || a.adresseTekst || "";
+  return {
+    AddressLine1: line1,
+    AddressLine2: "",
+    City: a.postdistrikt || "",
+    State: "",
+    PostalCode: a.postnummer ? String(a.postnummer) : "",
+  };
+}
 
 function formatDkAddress(a) {
   if (!a) return null;

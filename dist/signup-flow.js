@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T14:56:02.557Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T15:16:10.263Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -504,11 +504,11 @@ var AnvisningerSignupFlow = (() => {
     }
     const cvr = state.company.cvr;
     if (cvr) account.CVR_VAT = cvr;
-    const address = state.company.address;
-    if (address) account.BillingAddress = address;
+    const addressObject = state.company.addressObject;
+    if (addressObject) account.BillingAddress = addressObject;
     const employees = state.company.employees;
     if (employees !== void 0 && employees !== null) {
-      account.AntalAnsatte = String(employees);
+      account.AntalAnsatte = Number(employees);
     }
     const ean = getInputValueById(config.invoicingFieldIds.ean);
     if (ean) account.Ean = ean;
@@ -721,6 +721,7 @@ var AnvisningerSignupFlow = (() => {
                 cvr: data.cvr || cvr,
                 name: data.name || null,
                 address: data.address || null,
+                addressObject: data.addressObject || null,
                 employees: data.employees === void 0 ? null : data.employees
               };
               if (!state.company.name) {
