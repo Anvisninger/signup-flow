@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T13:56:58.073Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T14:31:47.763Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -296,6 +296,12 @@ var AnvisningerSignupFlow = (() => {
     nav.isProgrammaticNav = true;
     clickDot(sliderEl, idx);
     setTimeout(() => {
+      const slides = sliderEl.querySelectorAll("[data-step]");
+      slides.forEach((slide) => {
+        if (slide.dataset.step === stepName) {
+          slide.removeAttribute("aria-hidden");
+        }
+      });
       nav.isProgrammaticNav = false;
     }, 150);
   }
@@ -878,6 +884,18 @@ var AnvisningerSignupFlow = (() => {
           if (!input) return;
           input.addEventListener("input", updateHandOffButtonState);
         });
+        const phoneInput = document.getElementById(config.personFieldIds.phone);
+        if (phoneInput) {
+          phoneInput.addEventListener("input", () => {
+            const phone = getInputValueById(config.personFieldIds.phone);
+            const phoneErrorBoxId = getErrorBoxId(config, "contact", config.personFieldIds.phone);
+            if (phone && !isValidDanishPhone(phone)) {
+              showError(phoneErrorBoxId, "Telefonnummeret skal v\xE6re 8 cifre (dansk) eller inkludere landekode.");
+            } else {
+              showError(phoneErrorBoxId, "");
+            }
+          });
+        }
         updateHandOffButtonState();
         handOffButton.addEventListener("click", async (e) => {
           e.preventDefault();

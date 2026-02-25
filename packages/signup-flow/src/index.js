@@ -265,7 +265,15 @@ function goToStep(sliderEl, stepToIndex, stepName, nav) {
   }
   nav.isProgrammaticNav = true;
   clickDot(sliderEl, idx);
+  
+  // Remove aria-hidden from the slide that just became active to avoid focus issues
   setTimeout(() => {
+    const slides = sliderEl.querySelectorAll('[data-step]');
+    slides.forEach((slide) => {
+      if (slide.dataset.step === stepName) {
+        slide.removeAttribute('aria-hidden');
+      }
+    });
     nav.isProgrammaticNav = false;
   }, 150);
 }
@@ -985,6 +993,21 @@ export function initSignupFlow(userConfig = {}) {
         if (!input) return;
         input.addEventListener("input", updateHandOffButtonState);
       });
+
+      // Add real-time phone validation feedback
+      const phoneInput = document.getElementById(config.personFieldIds.phone);
+      if (phoneInput) {
+        phoneInput.addEventListener("input", () => {
+          const phone = getInputValueById(config.personFieldIds.phone);
+          const phoneErrorBoxId = getErrorBoxId(config, "contact", config.personFieldIds.phone);
+          
+          if (phone && !isValidDanishPhone(phone)) {
+            showError(phoneErrorBoxId, "Telefonnummeret skal være 8 cifre (dansk) eller inkludere landekode.");
+          } else {
+            showError(phoneErrorBoxId, "");
+          }
+        });
+      }
 
       updateHandOffButtonState();
 
