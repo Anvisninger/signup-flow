@@ -2,12 +2,14 @@ const BUILD_TIME = typeof __BUILD_TIME__ !== "undefined" ? __BUILD_TIME__ : null
 
 import { generateTransactionId, pushGAPurchaseEvent, setupOutsetaCompletionTracking } from "./ga-tracking.js";
 
-// TODO: Convert remaining IDs to kebab-case for Client-First compliance:
-// - cvrInputId: "CVR-input" → "cvr-input"
-// - outputIds: "CVR" → "cvr", "companyName" → "company-name", etc.
-// - radios.customerType.name: "customerType" → "customer-type"
-// - radios.basisOrPro.name: "basisOrPro" → "basis-or-pro"
-// - invoicingFieldIds: "EAN" → "ean", "Faktureringsmail" → "faktureringsmail"
+// TODO: Future improvements:
+// - Optimize error UI: Replace alert() with custom banner/modal for critical errors
+// - Convert remaining IDs to kebab-case for Client-First compliance:
+//   - cvrInputId: "CVR-input" → "cvr-input"
+//   - outputIds: "CVR" → "cvr", "companyName" → "company-name", etc.
+//   - radios.customerType.name: "customerType" → "customer-type"
+//   - radios.basisOrPro.name: "basisOrPro" → "basis-or-pro"
+//   - invoicingFieldIds: "EAN" → "ean", "Faktureringsmail" → "faktureringsmail"
 
 const DEFAULT_CONFIG = {
   sliderId: "slider-signup",
@@ -160,6 +162,7 @@ function clearAllErrors(config) {
   showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
   showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "");
   showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "");
+  showError(getErrorBoxId(config, "contact", config.personFieldIds.phone), "");
 }
 
 function showOverlay(overlayId, show) {
@@ -313,27 +316,9 @@ function syncNextArrowRequirement(sliderEl, radios) {
   setRightArrowEnabled(sliderEl, true);
 }
 
-function resetAll(state, nav, config) {
+function resetState(state, nav, config, keepPersonType = false) {
   nav.history = [];
-  state.personType = null;
-  state.subscriptionType = null;
-  state.planUid = null;
-  state.plan = null;
-  state.company = { cvr: null, name: null, address: null, employees: null };
-  clearAllErrors(config);
-}
-
-function resetFromContactSales(state, nav, config) {
-  nav.history = [];
-  state.subscriptionType = null;
-  state.planUid = null;
-  state.plan = null;
-  state.company = { cvr: null, name: null, address: null, employees: null };
-  clearAllErrors(config);
-}
-
-function resetAfterBasisOrPro(state, nav, config) {
-  nav.history = [];
+  if (!keepPersonType) state.personType = null;
   state.subscriptionType = null;
   state.planUid = null;
   state.plan = null;
@@ -342,8 +327,8 @@ function resetAfterBasisOrPro(state, nav, config) {
 }
 
 function resetFromStep(step, state, nav, config) {
-  if (step === "customerType") return resetAll(state, nav, config);
-  if (step === "basisOrPro") return resetAfterBasisOrPro(state, nav, config);
+  if (step === "customerType") return resetState(state, nav, config);
+  if (step === "basisOrPro") return resetState(state, nav, config, true);
   if (step === "cvr") {
     nav.history = [];
     state.company = { cvr: null, name: null, address: null, employees: null };
@@ -351,11 +336,6 @@ function resetFromStep(step, state, nav, config) {
     return;
   }
   showErrorForStep(config, step, "");
-}
-
-function nextAfterCVR(state) {
-  if (state.subscriptionType === "paid") return "company";
-  return "company";
 }
 
 function nextAfterCompany(state) {
@@ -545,7 +525,7 @@ export function initSignupFlow(userConfig = {}) {
       .querySelectorAll('input[type="radio"][name="' + config.radios.customerType.name + '"]')
       .forEach((r) => {
         r.addEventListener("change", () => {
-          resetAll(state, nav, config);
+          resetState(state, nav, config);
           syncNextArrowRequirement(sliderEl, config.radios);
         });
       });
@@ -554,16 +534,33 @@ export function initSignupFlow(userConfig = {}) {
       .querySelectorAll('input[type="radio"][name="' + config.radios.basisOrPro.name + '"]')
       .forEach((r) => {
         r.addEventListener("change", () => {
-          resetAfterBasisOrPro(state, nav, config);
+          resetState(state, nav, config, true);
           syncNextArrowRequirement(sliderEl, config.radios);
         });
       });
 
+    // Helper to clear field errors on input
+    const attachInputClearer = (fieldId, step, field) => {
+      const input = document.getElementById(fieldId);
+      if (!input) return;
+      const clearError = () => showError(getErrorBoxId(config, step, field), "");
+      if (step === "invoicing") {
+        input.addEventListener("input", () => {
+          if (field === "email") showInvoicingError(config, "email", "");
+          else if (field === "ean") showInvoicingError(config, "ean", "");
+        });
+      } else {
+        input.addEventListener("input", clearError);
+      }
+    };
+
+    // Attach input listeners for CVR validation
     const cvrInput = document.getElementById(config.cvrInputId);
     if (cvrInput) {
       cvrInput.addEventListener("input", () => showErrorForStep(config, "cvr", ""));
     }
 
+    // Email duplicate check on blur
     const emailInput = document.getElementById(config.personFieldIds.email);
     if (emailInput) {
       emailInput.addEventListener("blur", async () => {
@@ -582,29 +579,11 @@ export function initSignupFlow(userConfig = {}) {
       });
     }
 
-    const firstNameInput = document.getElementById(config.personFieldIds.firstName);
-    if (firstNameInput) {
-      firstNameInput.addEventListener("input", () => {
-        showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "");
-      });
-    }
-
-    const lastNameInput = document.getElementById(config.personFieldIds.lastName);
-    if (lastNameInput) {
-      lastNameInput.addEventListener("input", () => {
-        showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "");
-      });
-    }
-
-    const invoiceEmailInput = document.getElementById(config.invoicingFieldIds.invoiceEmail);
-    if (invoiceEmailInput) {
-      invoiceEmailInput.addEventListener("input", () => showInvoicingError(config, "email", ""));
-    }
-
-    const eanInput = document.getElementById(config.invoicingFieldIds.ean);
-    if (eanInput) {
-      eanInput.addEventListener("input", () => showInvoicingError(config, "ean", ""));
-    }
+    // Attach error clearers for contact fields
+    attachInputClearer(config.personFieldIds.firstName, "contact", config.personFieldIds.firstName);
+    attachInputClearer(config.personFieldIds.lastName, "contact", config.personFieldIds.lastName);
+    attachInputClearer(config.invoicingFieldIds.invoiceEmail, "invoicing", "email");
+    attachInputClearer(config.invoicingFieldIds.ean, "invoicing", "ean");
 
     sliderEl.addEventListener(
       "click",
@@ -807,7 +786,7 @@ export function initSignupFlow(userConfig = {}) {
               notifyPlanUidChange(config, state.planUid);
             }
 
-            goToStepWithHistory(sliderEl, stepToIndex, nextAfterCVR(state), nav);
+            goToStepWithHistory(sliderEl, stepToIndex, "company", nav);
           } catch (err) {
             console.error("[Flow] CVR/plan lookup failed:", err);
             
@@ -844,6 +823,7 @@ export function initSignupFlow(userConfig = {}) {
           e.preventDefault();
           e.stopPropagation();
 
+          // Clear step error before proceeding
           showErrorForStep(config, currentStep, "");
           const nextStep = nextAfterCompany(state);
           goToStepWithHistory(sliderEl, stepToIndex, nextStep, nav);
@@ -860,6 +840,7 @@ export function initSignupFlow(userConfig = {}) {
           e.preventDefault();
           e.stopPropagation();
 
+          // Clear invoicing field errors before validation
           clearInvoicingErrors(config);
 
           const invoiceEmail = getInputValueById(config.invoicingFieldIds.invoiceEmail);
@@ -894,7 +875,11 @@ export function initSignupFlow(userConfig = {}) {
         e.preventDefault();
         e.stopPropagation();
 
-        showErrorForCurrent(sliderEl, config, "");
+        // Clear all contact field errors before validation
+        showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "");
+        showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "");
+        showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
+        showError(getErrorBoxId(config, "contact", config.personFieldIds.phone), "");
 
         // Validate required contact fields
         const firstName = getInputValueById(config.personFieldIds.firstName);

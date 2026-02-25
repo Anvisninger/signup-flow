@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T12:02:52.234Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T12:09:59.464Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -205,6 +205,7 @@ var AnvisningerSignupFlow = (() => {
     showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
     showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "");
     showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "");
+    showError(getErrorBoxId(config, "contact", config.personFieldIds.phone), "");
   }
   function showOverlay(overlayId, show) {
     const el = document.getElementById(overlayId);
@@ -334,17 +335,9 @@ var AnvisningerSignupFlow = (() => {
     }
     setRightArrowEnabled(sliderEl, true);
   }
-  function resetAll(state, nav, config) {
+  function resetState(state, nav, config, keepPersonType = false) {
     nav.history = [];
-    state.personType = null;
-    state.subscriptionType = null;
-    state.planUid = null;
-    state.plan = null;
-    state.company = { cvr: null, name: null, address: null, employees: null };
-    clearAllErrors(config);
-  }
-  function resetAfterBasisOrPro(state, nav, config) {
-    nav.history = [];
+    if (!keepPersonType) state.personType = null;
     state.subscriptionType = null;
     state.planUid = null;
     state.plan = null;
@@ -352,8 +345,8 @@ var AnvisningerSignupFlow = (() => {
     clearAllErrors(config);
   }
   function resetFromStep(step, state, nav, config) {
-    if (step === "customerType") return resetAll(state, nav, config);
-    if (step === "basisOrPro") return resetAfterBasisOrPro(state, nav, config);
+    if (step === "customerType") return resetState(state, nav, config);
+    if (step === "basisOrPro") return resetState(state, nav, config, true);
     if (step === "cvr") {
       nav.history = [];
       state.company = { cvr: null, name: null, address: null, employees: null };
@@ -361,10 +354,6 @@ var AnvisningerSignupFlow = (() => {
       return;
     }
     showErrorForStep(config, step, "");
-  }
-  function nextAfterCVR(state) {
-    if (state.subscriptionType === "paid") return "company";
-    return "company";
   }
   function nextAfterCompany(state) {
     if (state.subscriptionType === "paid") return "planReview";
@@ -517,16 +506,29 @@ var AnvisningerSignupFlow = (() => {
       const stepToIndex = buildStepToIndex(sliderEl);
       document.querySelectorAll('input[type="radio"][name="' + config.radios.customerType.name + '"]').forEach((r) => {
         r.addEventListener("change", () => {
-          resetAll(state, nav, config);
+          resetState(state, nav, config);
           syncNextArrowRequirement(sliderEl, config.radios);
         });
       });
       document.querySelectorAll('input[type="radio"][name="' + config.radios.basisOrPro.name + '"]').forEach((r) => {
         r.addEventListener("change", () => {
-          resetAfterBasisOrPro(state, nav, config);
+          resetState(state, nav, config, true);
           syncNextArrowRequirement(sliderEl, config.radios);
         });
       });
+      const attachInputClearer = (fieldId, step, field) => {
+        const input = document.getElementById(fieldId);
+        if (!input) return;
+        const clearError = () => showError(getErrorBoxId(config, step, field), "");
+        if (step === "invoicing") {
+          input.addEventListener("input", () => {
+            if (field === "email") showInvoicingError(config, "email", "");
+            else if (field === "ean") showInvoicingError(config, "ean", "");
+          });
+        } else {
+          input.addEventListener("input", clearError);
+        }
+      };
       const cvrInput = document.getElementById(config.cvrInputId);
       if (cvrInput) {
         cvrInput.addEventListener("input", () => showErrorForStep(config, "cvr", ""));
@@ -547,26 +549,10 @@ var AnvisningerSignupFlow = (() => {
           }
         });
       }
-      const firstNameInput = document.getElementById(config.personFieldIds.firstName);
-      if (firstNameInput) {
-        firstNameInput.addEventListener("input", () => {
-          showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "");
-        });
-      }
-      const lastNameInput = document.getElementById(config.personFieldIds.lastName);
-      if (lastNameInput) {
-        lastNameInput.addEventListener("input", () => {
-          showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "");
-        });
-      }
-      const invoiceEmailInput = document.getElementById(config.invoicingFieldIds.invoiceEmail);
-      if (invoiceEmailInput) {
-        invoiceEmailInput.addEventListener("input", () => showInvoicingError(config, "email", ""));
-      }
-      const eanInput = document.getElementById(config.invoicingFieldIds.ean);
-      if (eanInput) {
-        eanInput.addEventListener("input", () => showInvoicingError(config, "ean", ""));
-      }
+      attachInputClearer(config.personFieldIds.firstName, "contact", config.personFieldIds.firstName);
+      attachInputClearer(config.personFieldIds.lastName, "contact", config.personFieldIds.lastName);
+      attachInputClearer(config.invoicingFieldIds.invoiceEmail, "invoicing", "email");
+      attachInputClearer(config.invoicingFieldIds.ean, "invoicing", "ean");
       sliderEl.addEventListener(
         "click",
         () => {
@@ -733,7 +719,7 @@ var AnvisningerSignupFlow = (() => {
                 setPlanUI(state.plan, config);
                 notifyPlanUidChange(config, state.planUid);
               }
-              goToStepWithHistory(sliderEl, stepToIndex, nextAfterCVR(state), nav);
+              goToStepWithHistory(sliderEl, stepToIndex, "company", nav);
             } catch (err) {
               console.error("[Flow] CVR/plan lookup failed:", err);
               if (err && err.isCritical) {
@@ -801,7 +787,10 @@ var AnvisningerSignupFlow = (() => {
         handOffButton.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          showErrorForCurrent(sliderEl, config, "");
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "");
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "");
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
+          showError(getErrorBoxId(config, "contact", config.personFieldIds.phone), "");
           const firstName = getInputValueById(config.personFieldIds.firstName);
           const lastName = getInputValueById(config.personFieldIds.lastName);
           const email = getInputValueById(config.personFieldIds.email);
