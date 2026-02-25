@@ -157,14 +157,19 @@ async function handleCheckEmail(url, env, corsHeaders) {
   const raw = await res.json();
   const people = raw?.items || [];
 
-  // If any person with this email exists, it's taken
-  const exists = people.length > 0;
+  // Only block if person exists AND is attached to an account
+  let exists = false;
+  if (people.length > 0) {
+    const person = people[0];
+    // Check if person has an account_id (linked to account) or AccountUid
+    exists = !!(person?.account_id || person?.AccountUid || person?.Account?.Uid);
+  }
 
   return json(
     {
       email,
       exists,
-      message: exists ? "Email address is already registered" : "Email is available",
+      message: exists ? "Email address is already registered to an account" : "Email is available",
     },
     200,
     corsHeaders
