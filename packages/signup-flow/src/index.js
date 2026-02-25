@@ -1105,6 +1105,12 @@ export function initSignupFlow(userConfig = {}) {
 
         const registrationDefaults = buildRegistrationDefaults(config, state) || {};
 
+        console.log("[Flow] Sending to Outseta:", {
+          planUid: state.planUid,
+          state: config.outsetaState,
+          registrationDefaults: JSON.stringify(registrationDefaults),
+        });
+
         window.Outseta.auth.open({
           planUid: state.planUid,
           state: config.outsetaState,
