@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T12:09:59.464Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T12:27:30.446Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
