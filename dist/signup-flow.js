@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T14:53:11.295Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T14:56:02.557Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -935,6 +935,7 @@ var AnvisningerSignupFlow = (() => {
               state.emailCheck = { email, status: "pending" };
               updateHandOffButtonState();
               const result = await checkEmailExists(email, config);
+              console.log("[Flow] Email check result:", result);
               if (result.exists) {
                 showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "Denne e-mailadresse er allerede registreret. Brug venligst en anden e-mailadresse.");
                 state.emailCheck = { email, status: "exists" };

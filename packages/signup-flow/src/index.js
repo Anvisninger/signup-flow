@@ -1065,6 +1065,7 @@ export function initSignupFlow(userConfig = {}) {
             state.emailCheck = { email, status: "pending" };
             updateHandOffButtonState();
             const result = await checkEmailExists(email, config);
+            console.log("[Flow] Email check result:", result);
             if (result.exists) {
               showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "Denne e-mailadresse er allerede registreret. Brug venligst en anden e-mailadresse.");
               state.emailCheck = { email, status: "exists" };
