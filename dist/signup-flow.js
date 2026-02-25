@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T13:11:37.373Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T13:56:58.073Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -318,8 +318,14 @@ var AnvisningerSignupFlow = (() => {
   }
   function isValidDanishPhone(phone) {
     if (!phone) return false;
-    const digits = phone.replace(/\D/g, "");
-    return digits.length === 8 || digits.length >= 10;
+    const raw = phone.trim();
+    const digits = raw.replace(/\D/g, "");
+    if (raw.startsWith("+") || raw.startsWith("00")) {
+      if (digits.startsWith("45")) return digits.length === 10;
+      if (digits.startsWith("0045")) return digits.length === 12;
+      return true;
+    }
+    return digits.length === 8;
   }
   function formatDanishPhone(phone) {
     if (!phone) return "";
@@ -329,9 +335,6 @@ var AnvisningerSignupFlow = (() => {
     }
     if (digits.startsWith("0045")) {
       return "+45" + digits.slice(4);
-    }
-    if (digits.startsWith("00")) {
-      return "+45" + digits.slice(2);
     }
     return phone;
   }
@@ -464,9 +467,21 @@ var AnvisningerSignupFlow = (() => {
     if (!el) return "";
     return (el.value || "").trim();
   }
+  function normalizeRegistrationDefaults(defaults) {
+    if (!defaults || typeof defaults !== "object") return {};
+    const person = defaults.Person || null;
+    const account = defaults.Account || null;
+    const normalized = {
+      ...defaults,
+      ...person ? { Person: person } : {},
+      ...account ? { Account: account } : {}
+    };
+    if (normalized.PersonAccount) delete normalized.PersonAccount;
+    return normalized;
+  }
   function buildRegistrationDefaults(config, state) {
     if (typeof config.registrationDefaultsBuilder === "function") {
-      return config.registrationDefaultsBuilder(state);
+      return normalizeRegistrationDefaults(config.registrationDefaultsBuilder(state));
     }
     const person = {
       Email: getInputValueById(config.personFieldIds.email),
@@ -484,14 +499,10 @@ var AnvisningerSignupFlow = (() => {
       EAN: getInputValueById(config.invoicingFieldIds.ean),
       Faktureringsmail: getInputValueById(config.invoicingFieldIds.invoiceEmail)
     };
-    return {
+    return normalizeRegistrationDefaults({
       Person: person,
-      Account: account,
-      PersonAccount: {
-        Person: { ...person },
-        Account: { ...account }
-      }
-    };
+      Account: account
+    });
   }
   function initSignupFlow(userConfig = {}) {
     const config = {
@@ -507,7 +518,8 @@ var AnvisningerSignupFlow = (() => {
       subscriptionType: null,
       planUid: null,
       plan: null,
-      company: { cvr: null, name: null, address: null, employees: null }
+      company: { cvr: null, name: null, address: null, employees: null },
+      emailCheck: { email: "", status: "idle" }
     };
     const nav = {
       history: [],
@@ -556,30 +568,19 @@ var AnvisningerSignupFlow = (() => {
       if (cvrInput) {
         cvrInput.addEventListener("input", () => showErrorForStep(config, "cvr", ""));
       }
-      const emailInput = document.getElementById(config.personFieldIds.email);
-      if (emailInput) {
-        emailInput.addEventListener("blur", async () => {
-          const email = (emailInput.value || "").trim();
-          if (!email) {
-            showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
-            updateHandOffButtonState();
-            return;
-          }
-          const result = await checkEmailExists(email, config);
-          if (result.exists) {
-            showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "Denne e-mailadresse er allerede registreret. Brug venligst en anden e-mailadresse.");
-          } else {
-            showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
-          }
-          updateHandOffButtonState();
-        });
-      }
       attachInputClearer(config.personFieldIds.firstName, "contact", config.personFieldIds.firstName);
       attachInputClearer(config.personFieldIds.lastName, "contact", config.personFieldIds.lastName);
       attachInputClearer(config.personFieldIds.email, "contact", config.personFieldIds.email);
       attachInputClearer(config.personFieldIds.phone, "contact", config.personFieldIds.phone);
       attachInputClearer(config.invoicingFieldIds.invoiceEmail, "invoicing", "email");
       attachInputClearer(config.invoicingFieldIds.ean, "invoicing", "ean");
+      const emailInputLive = document.getElementById(config.personFieldIds.email);
+      if (emailInputLive) {
+        emailInputLive.addEventListener("input", () => {
+          state.emailCheck = { email: "", status: "idle" };
+          updateHandOffButtonState();
+        });
+      }
       sliderEl.addEventListener(
         "click",
         () => {
@@ -811,14 +812,49 @@ var AnvisningerSignupFlow = (() => {
       if (form) form.addEventListener("submit", (e) => e.preventDefault());
       const handOffButton = document.getElementById(config.handOffButtonId);
       if (handOffButton) {
+        const handOffDefaultText = (handOffButton.textContent || "").trim() || "Bekr\xE6ft";
+        const setHandOffButtonText = (status) => {
+          if (status === "pending") {
+            handOffButton.textContent = "Validerer e-mail...";
+            return;
+          }
+          handOffButton.textContent = handOffDefaultText;
+        };
+        const setContactInputsEnabled = (enabled) => {
+          const contactFieldIds2 = [
+            config.personFieldIds.firstName,
+            config.personFieldIds.lastName,
+            config.personFieldIds.email,
+            config.personFieldIds.phone
+          ];
+          contactFieldIds2.forEach((fieldId) => {
+            const input = document.getElementById(fieldId);
+            if (!input) return;
+            input.disabled = !enabled;
+          });
+        };
+        const setBackArrowEnabled = (enabled) => {
+          const backArrow = sliderEl.querySelector(".w-slider-arrow-left");
+          if (!backArrow) return;
+          backArrow.style.pointerEvents = enabled ? "" : "none";
+          backArrow.style.opacity = enabled ? "" : "0.4";
+          backArrow.style.cursor = enabled ? "" : "default";
+          backArrow.setAttribute("aria-disabled", enabled ? "false" : "true");
+        };
         updateHandOffButtonState = () => {
           const firstName = getInputValueById(config.personFieldIds.firstName);
           const lastName = getInputValueById(config.personFieldIds.lastName);
           const email = getInputValueById(config.personFieldIds.email);
           const phone = getInputValueById(config.personFieldIds.phone);
+          const check = state.emailCheck || { email: "", status: "idle" };
           let enabled = true;
           if (!firstName || !lastName || !email || !isValidEmail(email)) {
             enabled = false;
+          }
+          if (email && isValidEmail(email)) {
+            if (check.email === email && (check.status === "exists" || check.status === "error" || check.status === "pending")) {
+              enabled = false;
+            }
           }
           if (phone && !isValidDanishPhone(phone)) {
             enabled = false;
@@ -827,6 +863,9 @@ var AnvisningerSignupFlow = (() => {
             enabled = false;
           }
           setButtonEnabled(handOffButton, enabled);
+          setHandOffButtonText(check.status);
+          setContactInputsEnabled(check.status !== "pending");
+          setBackArrowEnabled(check.status !== "pending");
         };
         const contactFieldIds = [
           config.personFieldIds.firstName,
@@ -840,7 +879,7 @@ var AnvisningerSignupFlow = (() => {
           input.addEventListener("input", updateHandOffButtonState);
         });
         updateHandOffButtonState();
-        handOffButton.addEventListener("click", (e) => {
+        handOffButton.addEventListener("click", async (e) => {
           e.preventDefault();
           e.stopPropagation();
           showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "");
@@ -862,6 +901,35 @@ var AnvisningerSignupFlow = (() => {
           if (!email || !isValidEmail(email)) {
             showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "En gyldig e-mailadresse er p\xE5kr\xE6vet.");
             hasError = true;
+          }
+          const emailCheck = state.emailCheck || { email: "", status: "idle" };
+          if (!hasError && email && isValidEmail(email)) {
+            if (emailCheck.email !== email || emailCheck.status === "idle") {
+              state.emailCheck = { email, status: "pending" };
+              updateHandOffButtonState();
+              const result = await checkEmailExists(email, config);
+              if (result.exists) {
+                showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "Denne e-mailadresse er allerede registreret. Brug venligst en anden e-mailadresse.");
+                state.emailCheck = { email, status: "exists" };
+                hasError = true;
+              } else if (result.error) {
+                showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "E-mailadressen kunne ikke valideres. Pr\xF8v igen.");
+                state.emailCheck = { email, status: "error" };
+                hasError = true;
+              } else {
+                state.emailCheck = { email, status: "ok" };
+              }
+              updateHandOffButtonState();
+            } else if (emailCheck.status === "pending") {
+              showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "E-mailadressen valideres. Vent et \xF8jeblik.");
+              hasError = true;
+            } else if (emailCheck.status === "exists") {
+              showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "Denne e-mailadresse er allerede registreret. Brug venligst en anden e-mailadresse.");
+              hasError = true;
+            } else if (emailCheck.status === "error") {
+              showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "E-mailadressen kunne ikke valideres. Pr\xF8v igen.");
+              hasError = true;
+            }
           }
           const phone = getInputValueById(config.personFieldIds.phone);
           if (phone && !isValidDanishPhone(phone)) {
