@@ -917,15 +917,6 @@ export function initSignupFlow(userConfig = {}) {
         }
 
         const registrationDefaults = buildRegistrationDefaults(config, state) || {};
-        const personDefaults = registrationDefaults.Person || {};
-        const accountDefaults = registrationDefaults.Account || {};
-
-        registrationDefaults.Person = personDefaults;
-        registrationDefaults.Account = accountDefaults;
-        registrationDefaults.PersonAccount = {
-          Person: personDefaults,
-          Account: accountDefaults,
-        };
 
         window.Outseta.auth.open({
           planUid: state.planUid,

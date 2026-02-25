@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T12:27:30.446Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T12:44:54.487Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -818,14 +818,6 @@ var AnvisningerSignupFlow = (() => {
             return;
           }
           const registrationDefaults = buildRegistrationDefaults(config, state) || {};
-          const personDefaults = registrationDefaults.Person || {};
-          const accountDefaults = registrationDefaults.Account || {};
-          registrationDefaults.Person = personDefaults;
-          registrationDefaults.Account = accountDefaults;
-          registrationDefaults.PersonAccount = {
-            Person: personDefaults,
-            Account: accountDefaults
-          };
           window.Outseta.auth.open({
             planUid: state.planUid,
             state: config.outsetaState,
