@@ -57,6 +57,7 @@ const DEFAULT_CONFIG = {
     itemCategory: "Abonnement",
     trackPurchase: true,
   },
+  outsetaDomain: "anvisninger.outseta.com",
 };
 
 const STEP_ORDER = [
@@ -354,7 +355,7 @@ function resetState(state, nav, config, keepPersonType = false) {
   state.subscriptionType = null;
   state.planUid = null;
   state.plan = null;
-  state.company = { cvr: null, name: null, address: null, employees: null };
+  state.company = { cvr: null, name: null, address: null, addressObject: null, employees: null };
   clearAllErrors(config);
 }
 
@@ -363,7 +364,7 @@ function resetFromStep(step, state, nav, config) {
   if (step === "basisOrPro") return resetState(state, nav, config, true);
   if (step === "cvr") {
     nav.history = [];
-    state.company = { cvr: null, name: null, address: null, employees: null };
+    state.company = { cvr: null, name: null, address: null, addressObject: null, employees: null };
     showErrorForStep(config, "cvr", "");
     return;
   }

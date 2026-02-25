@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T15:16:10.263Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T15:27:17.302Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -125,7 +125,8 @@ var AnvisningerSignupFlow = (() => {
       companyName: "Anvisninger",
       itemCategory: "Abonnement",
       trackPurchase: true
-    }
+    },
+    outsetaDomain: "anvisninger.outseta.com"
   };
   var STEP_ORDER = [
     "customerType",
@@ -366,7 +367,7 @@ var AnvisningerSignupFlow = (() => {
     state.subscriptionType = null;
     state.planUid = null;
     state.plan = null;
-    state.company = { cvr: null, name: null, address: null, employees: null };
+    state.company = { cvr: null, name: null, address: null, addressObject: null, employees: null };
     clearAllErrors(config);
   }
   function resetFromStep(step, state, nav, config) {
@@ -374,7 +375,7 @@ var AnvisningerSignupFlow = (() => {
     if (step === "basisOrPro") return resetState(state, nav, config, true);
     if (step === "cvr") {
       nav.history = [];
-      state.company = { cvr: null, name: null, address: null, employees: null };
+      state.company = { cvr: null, name: null, address: null, addressObject: null, employees: null };
       showErrorForStep(config, "cvr", "");
       return;
     }
