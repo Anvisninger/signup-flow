@@ -161,8 +161,17 @@ async function handleCheckEmail(url, env, corsHeaders) {
   let exists = false;
   if (people.length > 0) {
     const person = people[0];
-    // Check if person has an account_id (linked to account) or AccountUid
-    exists = !!(person?.account_id || person?.AccountUid || person?.Account?.Uid);
+    // Check multiple possible field names for account relationship
+    // PersonAccount: the join/link object containing the Account
+    // PersonAccount.Account: full account object
+    // PersonAccount.Account.Uid: the account UID
+    const hasAccount = !!(
+      person?.PersonAccount?.Account?.Uid || 
+      person?.account_id || 
+      person?.AccountUid || 
+      person?.Account?.Uid
+    );
+    exists = !!hasAccount;
   }
 
   return json(

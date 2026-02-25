@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T12:44:54.487Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T12:51:46.575Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -316,6 +316,9 @@ var AnvisningerSignupFlow = (() => {
     }
     if (digits.startsWith("0045")) {
       return "+45" + digits.slice(4);
+    }
+    if (digits.startsWith("00")) {
+      return "+45" + digits.slice(2);
     }
     return phone;
   }
@@ -810,6 +813,10 @@ var AnvisningerSignupFlow = (() => {
           const phone = getInputValueById(config.personFieldIds.phone);
           if (phone && !isValidDanishPhone(phone)) {
             showError(getErrorBoxId(config, "contact", config.personFieldIds.phone), "Telefonnummeret skal v\xE6re 8 cifre (dansk) eller inkludere landekode.");
+            hasError = true;
+          }
+          const emailErrorBox = document.getElementById(getErrorBoxId(config, "contact", config.personFieldIds.email));
+          if (emailErrorBox && emailErrorBox.textContent && emailErrorBox.style.display === "block") {
             hasError = true;
           }
           if (hasError) return;

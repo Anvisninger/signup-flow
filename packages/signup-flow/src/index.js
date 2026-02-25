@@ -294,6 +294,10 @@ function formatDanishPhone(phone) {
   if (digits.startsWith("0045")) {
     return "+45" + digits.slice(4);
   }
+  // If starts with 00 (but not 0045), convert to +45 by replacing with country code
+  if (digits.startsWith("00")) {
+    return "+45" + digits.slice(2);
+  }
   // Otherwise return as-is (already has country code like +45...)
   return phone;
 }
@@ -906,6 +910,12 @@ export function initSignupFlow(userConfig = {}) {
         const phone = getInputValueById(config.personFieldIds.phone);
         if (phone && !isValidDanishPhone(phone)) {
           showError(getErrorBoxId(config, "contact", config.personFieldIds.phone), "Telefonnummeret skal være 8 cifre (dansk) eller inkludere landekode.");
+          hasError = true;
+        }
+
+        // Check if email duplicate error is currently displayed
+        const emailErrorBox = document.getElementById(getErrorBoxId(config, "contact", config.personFieldIds.email));
+        if (emailErrorBox && emailErrorBox.textContent && emailErrorBox.style.display === "block") {
           hasError = true;
         }
 
