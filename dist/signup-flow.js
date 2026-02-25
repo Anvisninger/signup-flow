@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-24T14:24:19.431Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T12:02:52.234Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -302,6 +302,22 @@ var AnvisningerSignupFlow = (() => {
   function isValidEan(value) {
     return /^\d{13}$/.test(value);
   }
+  function isValidDanishPhone(phone) {
+    if (!phone) return false;
+    const digits = phone.replace(/\D/g, "");
+    return digits.length === 8 || digits.length >= 10;
+  }
+  function formatDanishPhone(phone) {
+    if (!phone) return "";
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length === 8) {
+      return "+45" + digits;
+    }
+    if (digits.startsWith("0045")) {
+      return "+45" + digits.slice(4);
+    }
+    return phone;
+  }
   function syncNextArrowRequirement(sliderEl, radios) {
     const step = getCurrentStep(sliderEl);
     if (step === "customerType") {
@@ -362,12 +378,30 @@ var AnvisningerSignupFlow = (() => {
       const res = await fetch(url, { ...options, signal: controller.signal });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data && data.error ? data.error : "Worker error (" + res.status + ")");
+        let errorMsg = "";
+        let isCritical = false;
+        if (res.status === 403) {
+          errorMsg = "Systemet er ikke tilg\xE6ngeligt fra dit lokation. Kontakt venligst support.";
+          isCritical = true;
+        } else if (res.status === 404) {
+          errorMsg = "Systemet svarede ikke korrekt. Pr\xF8v igen senere.";
+          isCritical = true;
+        } else if (res.status >= 500) {
+          errorMsg = "Serveren har problemer. Pr\xF8v igen senere.";
+          isCritical = true;
+        } else {
+          errorMsg = data && data.error ? data.error : "Systemfejl (" + res.status + ")";
+        }
+        const err = new Error(errorMsg);
+        err.isCritical = isCritical;
+        throw err;
       }
       return data;
     } catch (err) {
       if (err && err.name === "AbortError") {
-        throw new Error("Request timed out. Please try again.");
+        const timeoutErr = new Error("Anmodningen tok for lang tid. Pr\xF8v igen.");
+        timeoutErr.isCritical = true;
+        throw timeoutErr;
       }
       throw err;
     } finally {
@@ -435,7 +469,9 @@ var AnvisningerSignupFlow = (() => {
       LastName: getInputValueById(config.personFieldIds.lastName)
     };
     const phone = getInputValueById(config.personFieldIds.phone);
-    if (phone) person.PhoneMobile = phone;
+    if (phone) {
+      person.PhoneMobile = formatDanishPhone(phone);
+    }
     return {
       Person: person,
       Account: {
@@ -505,7 +541,7 @@ var AnvisningerSignupFlow = (() => {
           }
           const result = await checkEmailExists(email, config);
           if (result.exists) {
-            showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "This email is already registered. Please use another email address or contact our support.");
+            showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "Denne e-mailadresse er allerede registreret. Brug venligst en anden e-mailadresse.");
           } else {
             showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
           }
@@ -572,12 +608,6 @@ var AnvisningerSignupFlow = (() => {
             e.preventDefault();
             e.stopPropagation();
             const value = getRadioValueByName(config.radios.customerType.name);
-            if (!value) {
-              showErrorForStep(config, currentStep, "Please select a customer type.");
-              setRightArrowEnabled(sliderEl, false);
-              return;
-            }
-            showErrorForStep(config, currentStep, "");
             if (value === "Privat") {
               state.personType = "private";
               state.subscriptionType = "free";
@@ -604,12 +634,6 @@ var AnvisningerSignupFlow = (() => {
             e.preventDefault();
             e.stopPropagation();
             const value = getRadioValueByName(config.radios.basisOrPro.name);
-            if (!value) {
-              showErrorForStep(config, currentStep, "Please select Basis or Pro.");
-              setRightArrowEnabled(sliderEl, false);
-              return;
-            }
-            showErrorForStep(config, currentStep, "");
             if (value === "Basis") {
               state.subscriptionType = "free";
               state.planUid = config.basisPlanUid;
@@ -635,14 +659,14 @@ var AnvisningerSignupFlow = (() => {
             e.preventDefault();
             e.stopPropagation();
             if (!cvrInput) {
-              showErrorForStep(config, currentStep, "CVR input not found.");
+              showErrorForStep(config, currentStep, "Der opstod en teknisk fejl. Opdater siden og pr\xF8v igen.");
               return;
             }
             if (inFlight) return;
             showErrorForStep(config, currentStep, "");
             const cvr = (cvrInput.value || "").replace(/\s+/g, "");
             if (!/^\d{8}$/.test(cvr)) {
-              showErrorForStep(config, currentStep, "CVR must be 8 digits.");
+              showErrorForStep(config, currentStep, "CVR skal v\xE6re 8 cifre.");
               return;
             }
             inFlight = true;
@@ -650,11 +674,17 @@ var AnvisningerSignupFlow = (() => {
             showOverlay(config.overlayId, true);
             try {
               const data = await fetchCVR(cvr, config);
+              if (data.error) {
+                throw new Error(data.error);
+              }
+              if (!data.cvr || !data.name) {
+                throw new Error("CVR blev ikke fundet. Tjek at CVR'et er korrekt.");
+              }
               if (data.employees == null && state.subscriptionType === "paid") {
                 showErrorForStep(
                   config,
                   currentStep,
-                  "Employee count missing. Please contact sales for signup."
+                  "Vi kunne ikke finde medarbejdertallet for denne virksomhed. Kontakt venligst vores salgsteam."
                 );
                 return;
               }
@@ -664,6 +694,12 @@ var AnvisningerSignupFlow = (() => {
                 address: data.address || null,
                 employees: data.employees === void 0 ? null : data.employees
               };
+              if (!state.company.name) {
+                throw new Error("Virksomhedsnavn kunne ikke findes. Tjek CVR'et.");
+              }
+              if (!state.company.address) {
+                throw new Error("Virksomhedsadresse kunne ikke findes. Kontakt venligst vores salgsteam.");
+              }
               setText(config.outputIds.cvr, state.company.cvr);
               setText(config.outputIds.name, state.company.name);
               setText(config.outputIds.address, state.company.address);
@@ -700,10 +736,13 @@ var AnvisningerSignupFlow = (() => {
               goToStepWithHistory(sliderEl, stepToIndex, nextAfterCVR(state), nav);
             } catch (err) {
               console.error("[Flow] CVR/plan lookup failed:", err);
+              if (err && err.isCritical) {
+                window.AnvisningerSignupFlow.setCriticalError();
+              }
               showErrorForStep(
                 config,
                 currentStep,
-                err && err.message ? err.message : "Could not fetch details."
+                err && err.message ? err.message : "Vi kunne ikke hente virksomhedsoplysninger. Tjek CVR'et og pr\xF8v igen."
               );
             } finally {
               showOverlay(config.overlayId, false);
@@ -741,11 +780,11 @@ var AnvisningerSignupFlow = (() => {
             const ean = getInputValueById(config.invoicingFieldIds.ean);
             let hasError = false;
             if (invoiceEmail && !isValidEmail(invoiceEmail)) {
-              showInvoicingError(config, "email", "Invalid email format.");
+              showInvoicingError(config, "email", "Faktureringse-mailadresse er ugyldig.");
               hasError = true;
             }
             if (ean && !isValidEan(ean)) {
-              showInvoicingError(config, "ean", "EAN must be 13 digits.");
+              showInvoicingError(config, "ean", "EAN skal v\xE6re 13 cifre.");
               hasError = true;
             }
             if (hasError) return;
@@ -763,29 +802,30 @@ var AnvisningerSignupFlow = (() => {
           e.preventDefault();
           e.stopPropagation();
           showErrorForCurrent(sliderEl, config, "");
-          if (!state.planUid) {
-            showErrorForCurrent(sliderEl, config, "Missing plan selection.");
-            return;
-          }
           const firstName = getInputValueById(config.personFieldIds.firstName);
           const lastName = getInputValueById(config.personFieldIds.lastName);
           const email = getInputValueById(config.personFieldIds.email);
           let hasError = false;
           if (!firstName) {
-            showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "First name is required.");
+            showError(getErrorBoxId(config, "contact", config.personFieldIds.firstName), "Fornavn er p\xE5kr\xE6vet.");
             hasError = true;
           }
           if (!lastName) {
-            showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "Last name is required.");
+            showError(getErrorBoxId(config, "contact", config.personFieldIds.lastName), "Efternavn er p\xE5kr\xE6vet.");
             hasError = true;
           }
           if (!email || !isValidEmail(email)) {
-            showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "Valid email is required.");
+            showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "En gyldig e-mailadresse er p\xE5kr\xE6vet.");
+            hasError = true;
+          }
+          const phone = getInputValueById(config.personFieldIds.phone);
+          if (phone && !isValidDanishPhone(phone)) {
+            showError(getErrorBoxId(config, "contact", config.personFieldIds.phone), "Telefonnummeret skal v\xE6re 8 cifre (dansk) eller inkludere landekode.");
             hasError = true;
           }
           if (hasError) return;
           if (!window.Outseta || !window.Outseta.auth || !window.Outseta.auth.open) {
-            showErrorForCurrent(sliderEl, config, "Outseta embed is not available.");
+            showErrorForCurrent(sliderEl, config, "Betalingssystemet er ikke tilg\xE6ngeligt. Pr\xF8v igen senere.");
             return;
           }
           const registrationDefaults = buildRegistrationDefaults(config, state) || {};
@@ -817,6 +857,13 @@ var AnvisningerSignupFlow = (() => {
       getState: () => ({ ...state, company: { ...state.company } })
     };
   }
+  window.AnvisningerSignupFlow = window.AnvisningerSignupFlow || {};
+  window.AnvisningerSignupFlow.initSignupFlow = initSignupFlow;
+  window.AnvisningerSignupFlow.isCritical = false;
+  window.AnvisningerSignupFlow.setCriticalError = function() {
+    window.AnvisningerSignupFlow.isCritical = true;
+    console.warn("[Flow] Critical error detected - form is broken");
+  };
   var index_default = initSignupFlow;
   return __toCommonJS(index_exports);
 })();

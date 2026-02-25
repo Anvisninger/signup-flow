@@ -1,13 +1,33 @@
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
+const ALLOWED_ORIGINS = [
+  "https://anvisninger-dk-e81a432f7570a8eceb515ecb.webflow.io",
+  "https://anvisninger.dk",
+];
 
-    // CORS (Webflow friendly)
-    const cors = {
-      "Access-Control-Allow-Origin": "*",
+function getCorsHeaders(origin) {
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    return {
+      "Access-Control-Allow-Origin": origin,
       "Access-Control-Allow-Methods": "GET,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
+  }
+  return {};
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const origin = request.headers.get("Origin") || "";
+
+    // Check origin
+    if (!ALLOWED_ORIGINS.includes(origin)) {
+      return new Response(JSON.stringify({ error: "Origin not allowed" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const cors = getCorsHeaders(origin);
 
     if (request.method === "OPTIONS") return new Response(null, { headers: cors });
 

@@ -1,12 +1,33 @@
+const ALLOWED_ORIGINS = [
+  "https://anvisninger-dk-e81a432f7570a8eceb515ecb.webflow.io",
+  "https://anvisninger.dk",
+];
+
+function getCorsHeaders(origin) {
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    return {
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Methods": "POST,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    };
+  }
+  return {};
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const origin = request.headers.get("Origin") || "";
 
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    };
+    // Check origin
+    if (!ALLOWED_ORIGINS.includes(origin)) {
+      return new Response(JSON.stringify({ error: "Origin not allowed" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const corsHeaders = getCorsHeaders(origin);
 
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
