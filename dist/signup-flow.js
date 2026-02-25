@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T14:48:43.215Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T14:53:11.295Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -498,10 +498,12 @@ var AnvisningerSignupFlow = (() => {
       person.PhoneMobile = formatDanishPhone(phone);
     }
     const account = {};
+    const companyName = state.company.name;
+    if (companyName) {
+      account.Name = companyName;
+    }
     const cvr = state.company.cvr;
     if (cvr) account.CVR_VAT = cvr;
-    const companyName = state.company.name;
-    if (companyName) account.Name = companyName;
     const address = state.company.address;
     if (address) account.BillingAddress = address;
     const employees = state.company.employees;
@@ -970,7 +972,7 @@ var AnvisningerSignupFlow = (() => {
             showErrorForCurrent(sliderEl, config, "Betalingssystemet er ikke tilg\xE6ngeligt. Pr\xF8v igen senere.");
             return;
           }
-          const registrationDefaults = buildRegistrationDefaults(config, state) || {};
+          const registrationDefaults = buildRegistrationDefaults(config, state) || { Person: {}, Account: {} };
           console.log("[Flow] Sending to Outseta:", {
             planUid: state.planUid,
             state: config.outsetaState,

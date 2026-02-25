@@ -511,19 +511,24 @@ function buildRegistrationDefaults(config, state) {
     FirstName: getInputValueById(config.personFieldIds.firstName),
     LastName: getInputValueById(config.personFieldIds.lastName),
   };
+  
   const phone = getInputValueById(config.personFieldIds.phone);
   if (phone) {
     person.PhoneMobile = formatDanishPhone(phone);
   }
 
-  // Build Account with only fields that have values
+  // Start with required Account field
   const account = {};
   
+  // Always include Name if it has a value
+  const companyName = state.company.name;
+  if (companyName) {
+    account.Name = companyName;
+  }
+  
+  // Add optional Account fields
   const cvr = state.company.cvr;
   if (cvr) account.CVR_VAT = cvr;
-  
-  const companyName = state.company.name;
-  if (companyName) account.Name = companyName;
   
   const address = state.company.address;
   if (address) account.BillingAddress = address;
@@ -1103,7 +1108,7 @@ export function initSignupFlow(userConfig = {}) {
           return;
         }
 
-        const registrationDefaults = buildRegistrationDefaults(config, state) || {};
+        const registrationDefaults = buildRegistrationDefaults(config, state) || { Person: {}, Account: {} };
 
         console.log("[Flow] Sending to Outseta:", {
           planUid: state.planUid,
