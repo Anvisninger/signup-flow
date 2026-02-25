@@ -141,7 +141,8 @@ async function handleCheckEmail(url, env, corsHeaders) {
   }
 
   // Query Outseta for person with this email
-  const endpoint = `https://anvisninger.outseta.com/api/v1/crm/people?email=${encodeURIComponent(email)}`;
+  // Include PersonAccount relationship to check if person is attached to an account
+  const endpoint = `https://anvisninger.outseta.com/api/v1/crm/people?email=${encodeURIComponent(email)}&expand=PersonAccount`;
 
   const res = await fetchOutseta(endpoint, env);
 
@@ -161,6 +162,13 @@ async function handleCheckEmail(url, env, corsHeaders) {
   let exists = false;
   if (people.length > 0) {
     const person = people[0];
+    // Log the structure for debugging
+    console.error("[check-email] Person object keys:", Object.keys(person));
+    console.error("[check-email] PersonAccount:", person?.PersonAccount);
+    console.error("[check-email] Account:", person?.Account);
+    console.error("[check-email] account_id:", person?.account_id);
+    console.error("[check-email] AccountUid:", person?.AccountUid);
+    
     // Check multiple possible field names for account relationship
     // PersonAccount: the join/link object containing the Account
     // PersonAccount.Account: full account object
@@ -172,6 +180,7 @@ async function handleCheckEmail(url, env, corsHeaders) {
       person?.Account?.Uid
     );
     exists = !!hasAccount;
+    console.error("[check-email] Result for", email, ": exists =", exists, "hasAccount =", hasAccount);
   }
 
   return json(
