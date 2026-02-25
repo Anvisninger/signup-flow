@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T14:31:47.763Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T14:46:22.925Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -474,15 +474,14 @@ var AnvisningerSignupFlow = (() => {
     return (el.value || "").trim();
   }
   function normalizeRegistrationDefaults(defaults) {
-    if (!defaults || typeof defaults !== "object") return {};
-    const person = defaults.Person || null;
-    const account = defaults.Account || null;
+    if (!defaults || typeof defaults !== "object") return { Person: {}, Account: {} };
     const normalized = {
-      ...defaults,
-      ...person ? { Person: person } : {},
-      ...account ? { Account: account } : {}
+      Person: defaults.Person || {},
+      Account: defaults.Account || {}
     };
-    if (normalized.PersonAccount) delete normalized.PersonAccount;
+    if (defaults.Subscription) {
+      normalized.Subscription = defaults.Subscription;
+    }
     return normalized;
   }
   function buildRegistrationDefaults(config, state) {
@@ -498,13 +497,21 @@ var AnvisningerSignupFlow = (() => {
     if (phone) {
       person.PhoneMobile = formatDanishPhone(phone);
     }
-    const account = {
-      Name: state.company.name || "",
-      BillingAddress: state.company.address || "",
-      AntalAnsatte: state.company.employees === void 0 || state.company.employees === null ? "" : String(state.company.employees),
-      EAN: getInputValueById(config.invoicingFieldIds.ean),
-      Faktureringsmail: getInputValueById(config.invoicingFieldIds.invoiceEmail)
-    };
+    const account = {};
+    const cvr = state.company.cvr;
+    if (cvr) account.CVR_VAT = cvr;
+    const companyName = state.company.name;
+    if (companyName) account.Name = companyName;
+    const address = state.company.address;
+    if (address) account.BillingAddress = address;
+    const employees = state.company.employees;
+    if (employees !== void 0 && employees !== null) {
+      account.AntalAnsatte = String(employees);
+    }
+    const ean = getInputValueById(config.invoicingFieldIds.ean);
+    if (ean) account.Ean = ean;
+    const invoiceEmail = getInputValueById(config.invoicingFieldIds.invoiceEmail);
+    if (invoiceEmail) account.Faktureringsmail = invoiceEmail;
     return normalizeRegistrationDefaults({
       Person: person,
       Account: account

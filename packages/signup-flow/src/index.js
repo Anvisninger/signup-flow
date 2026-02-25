@@ -486,18 +486,17 @@ function getInputValueById(id) {
 }
 
 function normalizeRegistrationDefaults(defaults) {
-  if (!defaults || typeof defaults !== "object") return {};
-
-  const person = defaults.Person || null;
-  const account = defaults.Account || null;
+  if (!defaults || typeof defaults !== "object") return { Person: {}, Account: {} };
 
   const normalized = {
-    ...defaults,
-    ...(person ? { Person: person } : {}),
-    ...(account ? { Account: account } : {}),
+    Person: defaults.Person || {},
+    Account: defaults.Account || {},
   };
-
-  if (normalized.PersonAccount) delete normalized.PersonAccount;
+  
+  // Subscription is optional
+  if (defaults.Subscription) {
+    normalized.Subscription = defaults.Subscription;
+  }
 
   return normalized;
 }
@@ -517,16 +516,28 @@ function buildRegistrationDefaults(config, state) {
     person.PhoneMobile = formatDanishPhone(phone);
   }
 
-  const account = {
-    Name: state.company.name || "",
-    BillingAddress: state.company.address || "",
-    AntalAnsatte:
-      state.company.employees === undefined || state.company.employees === null
-        ? ""
-        : String(state.company.employees),
-    EAN: getInputValueById(config.invoicingFieldIds.ean),
-    Faktureringsmail: getInputValueById(config.invoicingFieldIds.invoiceEmail),
-  };
+  // Build Account with only fields that have values
+  const account = {};
+  
+  const cvr = state.company.cvr;
+  if (cvr) account.CVR_VAT = cvr;
+  
+  const companyName = state.company.name;
+  if (companyName) account.Name = companyName;
+  
+  const address = state.company.address;
+  if (address) account.BillingAddress = address;
+  
+  const employees = state.company.employees;
+  if (employees !== undefined && employees !== null) {
+    account.AntalAnsatte = String(employees);
+  }
+  
+  const ean = getInputValueById(config.invoicingFieldIds.ean);
+  if (ean) account.Ean = ean;
+  
+  const invoiceEmail = getInputValueById(config.invoicingFieldIds.invoiceEmail);
+  if (invoiceEmail) account.Faktureringsmail = invoiceEmail;
 
   return normalizeRegistrationDefaults({
     Person: person,
