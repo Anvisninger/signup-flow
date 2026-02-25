@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-25T12:51:46.575Z" : null;
+  var BUILD_TIME = true ? "2026-02-25T13:11:37.373Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -238,6 +238,19 @@ var AnvisningerSignupFlow = (() => {
     right.style.opacity = enabled ? "" : "0.4";
     right.style.cursor = enabled ? "" : "default";
     right.setAttribute("aria-disabled", enabled ? "false" : "true");
+  }
+  function setButtonEnabled(button, enabled) {
+    if (!button) return;
+    button.style.pointerEvents = enabled ? "" : "none";
+    button.style.opacity = enabled ? "" : "0.5";
+    button.style.cursor = enabled ? "" : "default";
+    button.setAttribute("aria-disabled", enabled ? "false" : "true");
+    if ("disabled" in button) button.disabled = !enabled;
+  }
+  function isErrorVisible(errorBoxId) {
+    const el = document.getElementById(errorBoxId);
+    if (!el) return false;
+    return (el.textContent || "").trim() !== "" && el.style.display !== "none";
   }
   function getSlides(sliderEl) {
     return Array.from(sliderEl.querySelectorAll(".w-slide"));
@@ -464,14 +477,19 @@ var AnvisningerSignupFlow = (() => {
     if (phone) {
       person.PhoneMobile = formatDanishPhone(phone);
     }
+    const account = {
+      Name: state.company.name || "",
+      BillingAddress: state.company.address || "",
+      AntalAnsatte: state.company.employees === void 0 || state.company.employees === null ? "" : String(state.company.employees),
+      EAN: getInputValueById(config.invoicingFieldIds.ean),
+      Faktureringsmail: getInputValueById(config.invoicingFieldIds.invoiceEmail)
+    };
     return {
       Person: person,
-      Account: {
-        Name: state.company.name || "",
-        BillingAddress: state.company.address || "",
-        AntalAnsatte: state.company.employees === void 0 || state.company.employees === null ? "" : String(state.company.employees),
-        EAN: getInputValueById(config.invoicingFieldIds.ean),
-        Faktureringsmail: getInputValueById(config.invoicingFieldIds.invoiceEmail)
+      Account: account,
+      PersonAccount: {
+        Person: { ...person },
+        Account: { ...account }
       }
     };
   }
@@ -506,6 +524,8 @@ var AnvisningerSignupFlow = (() => {
         console.error("[Flow] slider not found:", config.sliderId);
         return;
       }
+      let updateHandOffButtonState = () => {
+      };
       const stepToIndex = buildStepToIndex(sliderEl);
       document.querySelectorAll('input[type="radio"][name="' + config.radios.customerType.name + '"]').forEach((r) => {
         r.addEventListener("change", () => {
@@ -542,6 +562,7 @@ var AnvisningerSignupFlow = (() => {
           const email = (emailInput.value || "").trim();
           if (!email) {
             showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
+            updateHandOffButtonState();
             return;
           }
           const result = await checkEmailExists(email, config);
@@ -550,10 +571,13 @@ var AnvisningerSignupFlow = (() => {
           } else {
             showError(getErrorBoxId(config, "contact", config.personFieldIds.email), "");
           }
+          updateHandOffButtonState();
         });
       }
       attachInputClearer(config.personFieldIds.firstName, "contact", config.personFieldIds.firstName);
       attachInputClearer(config.personFieldIds.lastName, "contact", config.personFieldIds.lastName);
+      attachInputClearer(config.personFieldIds.email, "contact", config.personFieldIds.email);
+      attachInputClearer(config.personFieldIds.phone, "contact", config.personFieldIds.phone);
       attachInputClearer(config.invoicingFieldIds.invoiceEmail, "invoicing", "email");
       attachInputClearer(config.invoicingFieldIds.ean, "invoicing", "ean");
       sliderEl.addEventListener(
@@ -787,6 +811,35 @@ var AnvisningerSignupFlow = (() => {
       if (form) form.addEventListener("submit", (e) => e.preventDefault());
       const handOffButton = document.getElementById(config.handOffButtonId);
       if (handOffButton) {
+        updateHandOffButtonState = () => {
+          const firstName = getInputValueById(config.personFieldIds.firstName);
+          const lastName = getInputValueById(config.personFieldIds.lastName);
+          const email = getInputValueById(config.personFieldIds.email);
+          const phone = getInputValueById(config.personFieldIds.phone);
+          let enabled = true;
+          if (!firstName || !lastName || !email || !isValidEmail(email)) {
+            enabled = false;
+          }
+          if (phone && !isValidDanishPhone(phone)) {
+            enabled = false;
+          }
+          if (isErrorVisible(getErrorBoxId(config, "contact", config.personFieldIds.firstName)) || isErrorVisible(getErrorBoxId(config, "contact", config.personFieldIds.lastName)) || isErrorVisible(getErrorBoxId(config, "contact", config.personFieldIds.email)) || isErrorVisible(getErrorBoxId(config, "contact", config.personFieldIds.phone))) {
+            enabled = false;
+          }
+          setButtonEnabled(handOffButton, enabled);
+        };
+        const contactFieldIds = [
+          config.personFieldIds.firstName,
+          config.personFieldIds.lastName,
+          config.personFieldIds.email,
+          config.personFieldIds.phone
+        ];
+        contactFieldIds.forEach((fieldId) => {
+          const input = document.getElementById(fieldId);
+          if (!input) return;
+          input.addEventListener("input", updateHandOffButtonState);
+        });
+        updateHandOffButtonState();
         handOffButton.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
