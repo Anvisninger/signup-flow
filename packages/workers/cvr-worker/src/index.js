@@ -148,14 +148,6 @@ export default {
       employeesPeriod = String(latestAnnual.aar);
     }
 
-    // If antalAnsatte is 0 but antalInklusivEjere is set (owner counts),
-    // use that instead — this matches what virk.dk shows for small firms.
-    if ((employees == null || employees === 0) && latestAnnual?.antalInklusivEjere) {
-      employees = latestAnnual.antalInklusivEjere;
-      employeesSource = "annualInklusivEjere";
-      employeesPeriod = String(latestAnnual.aar);
-    }
-
     // Last resort for sole traders with no employment records at all
     if (employees == null && isSoleTrade) {
       employees = 1;
@@ -184,7 +176,7 @@ export default {
                 ? { aar: latestQuarterly.aar, kvartal: latestQuarterly.kvartal, antalAnsatte: latestQuarterly.antalAnsatte, intervalKode: latestQuarterly.intervalKodeAntalAnsatte }
                 : null,
               latestAnnual: latestAnnual
-                ? { aar: latestAnnual.aar, antalAnsatte: latestAnnual.antalAnsatte, antalInklusivEjere: latestAnnual.antalInklusivEjere, intervalKode: latestAnnual.intervalKodeAntalAnsatte }
+                ? { aar: latestAnnual.aar, antalAnsatte: latestAnnual.antalAnsatte, intervalKode: latestAnnual.intervalKodeAntalAnsatte }
                 : null,
               metadataMonthly: meta?.nyesteMaanedsbeskaeftigelse
                 ? { aar: meta.nyesteMaanedsbeskaeftigelse.aar, maaned: meta.nyesteMaanedsbeskaeftigelse.maaned, antalAnsatte: meta.nyesteMaanedsbeskaeftigelse.antalAnsatte }
