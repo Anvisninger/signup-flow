@@ -97,8 +97,10 @@ export default {
       meta?.nyesteVirksomhedsform?.kortBeskrivelse ||
       company?.virksomhedsform?.[0]?.kortBeskrivelse ||
       null;
+    // ENK = Enkeltmandsvirksomhed, PMV = Personligt ejet mindre virksomhed
+    const SOLE_TRADE_CODES = ["ENK", "PMV"];
     const isSoleTrade = virksomhedsform
-      ? virksomhedsform.toLowerCase().includes("enkeltmands")
+      ? SOLE_TRADE_CODES.includes(virksomhedsform.toUpperCase())
       : false;
 
     // Address
