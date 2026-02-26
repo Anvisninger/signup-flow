@@ -114,24 +114,50 @@ export default {
     const address = formatDkAddress(addr);
     const addressObject = buildOutsetaAddress(addr);
 
-    // Employees + source (stable, explicit)
-    const monthly = meta?.nyesteMaanedsbeskaeftigelse?.antalAnsatte;
-    const annual = meta?.nyesteAarsbeskaeftigelse?.antalAnsatte;
-    const quarterly = meta?.nyesteKvartalsbeskaeftigelse?.antalAnsatte;
+    // Employees: read from the raw sorted arrays so we always get the truly
+    // most recent period — the virksomhedMetadata "nyeste*" shortcuts can lag
+    // behind the underlying arrays in edge cases.
+    //
+    // Priority: monthly > quarterly > annual.
+    // Within each type, sort descending by aar (+ maaned/kvartal) and take
+    // the first entry with a non-null antalAnsatte.
+    //
+    // For annual records we also check antalInklusivEjere: this counts owners
+    // as well as employees, and it's what virk.dk displays for small firms /
+    // sole traders where antalAnsatte is 0.
+
+    const latestMonthly = latestRecord(company.maanedsbeskaeftigelse, (r) => r.aar * 100 + (r.maaned || 0));
+    const latestQuarterly = latestRecord(company.kvartalsbeskaeftigelse, (r) => r.aar * 10 + (r.kvartal || 0));
+    const latestAnnual = latestRecord(company.aarsbeskaeftigelse, (r) => r.aar);
 
     let employees = null;
     let employeesSource = "none";
+    let employeesPeriod = null;
 
-    if (monthly != null) {
-      employees = monthly;
+    if (latestMonthly?.antalAnsatte != null) {
+      employees = latestMonthly.antalAnsatte;
       employeesSource = "monthly";
-    } else if (annual != null) {
-      employees = annual;
-      employeesSource = "annual";
-    } else if (quarterly != null) {
-      employees = quarterly;
+      employeesPeriod = `${latestMonthly.aar}-${String(latestMonthly.maaned).padStart(2, "0")}`;
+    } else if (latestQuarterly?.antalAnsatte != null) {
+      employees = latestQuarterly.antalAnsatte;
       employeesSource = "quarterly";
-    } else if (isSoleTrade) {
+      employeesPeriod = `${latestQuarterly.aar}-Q${latestQuarterly.kvartal}`;
+    } else if (latestAnnual?.antalAnsatte != null) {
+      employees = latestAnnual.antalAnsatte;
+      employeesSource = "annual";
+      employeesPeriod = String(latestAnnual.aar);
+    }
+
+    // If antalAnsatte is 0 but antalInklusivEjere is set (owner counts),
+    // use that instead — this matches what virk.dk shows for small firms.
+    if ((employees == null || employees === 0) && latestAnnual?.antalInklusivEjere) {
+      employees = latestAnnual.antalInklusivEjere;
+      employeesSource = "annualInklusivEjere";
+      employeesPeriod = String(latestAnnual.aar);
+    }
+
+    // Last resort for sole traders with no employment records at all
+    if (employees == null && isSoleTrade) {
       employees = 1;
       employeesSource = "soleTrade";
     }
@@ -143,21 +169,26 @@ export default {
       addressObject,
       employees,
       employeesSource,
+      employeesPeriod,
       isSoleTrade,
       ...(debug
         ? {
             debug: {
               companyStatus: companyRes.status,
-              usedEmployeesFrom:
-                employeesSource === "monthly"
-                  ? "virksomhedMetadata.nyesteMaanedsbeskaeftigelse.antalAnsatte"
-                  : employeesSource === "annual"
-                    ? "virksomhedMetadata.nyesteAarsbeskaeftigelse.antalAnsatte"
-                    : employeesSource === "quarterly"
-                      ? "virksomhedMetadata.nyesteKvartalsbeskaeftigelse.antalAnsatte"
-                      : employeesSource === "soleTrade"
-                        ? "defaulted to 1 (enkeltmandsvirksomhed)"
-                        : "none",
+              employeesSource,
+              employeesPeriod,
+              latestMonthly: latestMonthly
+                ? { aar: latestMonthly.aar, maaned: latestMonthly.maaned, antalAnsatte: latestMonthly.antalAnsatte, intervalKode: latestMonthly.intervalKodeAntalAnsatte }
+                : null,
+              latestQuarterly: latestQuarterly
+                ? { aar: latestQuarterly.aar, kvartal: latestQuarterly.kvartal, antalAnsatte: latestQuarterly.antalAnsatte, intervalKode: latestQuarterly.intervalKodeAntalAnsatte }
+                : null,
+              latestAnnual: latestAnnual
+                ? { aar: latestAnnual.aar, antalAnsatte: latestAnnual.antalAnsatte, antalInklusivEjere: latestAnnual.antalInklusivEjere, intervalKode: latestAnnual.intervalKodeAntalAnsatte }
+                : null,
+              metadataMonthly: meta?.nyesteMaanedsbeskaeftigelse
+                ? { aar: meta.nyesteMaanedsbeskaeftigelse.aar, maaned: meta.nyesteMaanedsbeskaeftigelse.maaned, antalAnsatte: meta.nyesteMaanedsbeskaeftigelse.antalAnsatte }
+                : null,
             },
           }
         : {}),
@@ -177,6 +208,11 @@ export default {
     return response;
   },
 };
+
+function latestRecord(arr, scoreFn) {
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+  return arr.reduce((best, cur) => (scoreFn(cur) > scoreFn(best) ? cur : best));
+}
 
 function buildOutsetaAddress(a) {
   if (!a) return null;
