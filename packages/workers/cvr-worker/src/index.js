@@ -41,6 +41,7 @@ export default {
     }
 
     const companyUrl = `https://api.cvr.dev/api/cvr/virksomhed?cvr_nummer=${encodeURIComponent(cvr)}`;
+    const ansatteUrl = `https://api.cvr.dev/api/cvrdev/virksomhed/ansatte?cvr_nummer=${encodeURIComponent(cvr)}`;
 
     // Cache: use a separate cache key per CVR
     const cacheKey = new Request(url.toString(), request);
@@ -53,9 +54,11 @@ export default {
     }
 
     // cvr.dev docs: Authorization: Bearer <api-key>
-    const companyRes = await fetch(companyUrl, {
-      headers: { Authorization: `Bearer ${env.CVR_DEV_API_KEY}` },
-    });
+    const authHeader = { Authorization: `Bearer ${env.CVR_DEV_API_KEY}` };
+    const [companyRes, ansatteRes] = await Promise.all([
+      fetch(companyUrl, { headers: authHeader }),
+      fetch(ansatteUrl, { headers: authHeader }),
+    ]);
 
     const companyText = await companyRes.text();
 
@@ -114,22 +117,35 @@ export default {
     const address = formatDkAddress(addr);
     const addressObject = buildOutsetaAddress(addr);
 
-    // Employees: read from the raw sorted arrays so we always get the truly
-    // most recent period — the virksomhedMetadata "nyeste*" shortcuts can lag
-    // behind the underlying arrays in edge cases.
-    //
-    // Priority: monthly > quarterly > annual.
-    // Within each type, sort descending by aar (+ maaned/kvartal) and take
-    // the first entry with a non-null antalAnsatte.
-    //
-    // For annual records we also check antalInklusivEjere: this counts owners
-    // as well as employees, and it's what virk.dk displays for small firms /
-    // sole traders where antalAnsatte is 0.
+    // Parse the aggregated ansatte endpoint (covers all P-units; more up to date
+    // than the virksomhed-level beskaeftigelse arrays which stop being updated for
+    // many companies after a few years).
+    let ansatteLatest = null;
+    if (ansatteRes.ok) {
+      try {
+        const ansatteList = JSON.parse(await ansatteRes.text());
+        // API returns either a bare object or a 1-element array depending on version
+        const ansatteObj = Array.isArray(ansatteList) ? ansatteList[0] : ansatteList;
+        const records = ansatteObj?.ansatte;
+        if (Array.isArray(records)) {
+          // Filter to non-null ansatte, then pick the record with the latest dato.
+          ansatteLatest = latestRecord(
+            records.filter((r) => r.ansatte != null),
+            (r) => r.dato ? r.dato.replace(/-/g, "") : "0"
+          );
+        }
+      } catch {
+        // Non-fatal — fall back to virksomhed arrays below
+      }
+    }
 
-    // Filter to only records with a reported antalAnsatte before picking the
-    // latest — the CVR array often contains a trailing null entry for the
-    // current (not yet published) period, which would otherwise shadow the
-    // most recent real figure.
+    // Employees: prefer the aggregated ansatte endpoint for most companies.
+    // Fall back to the raw virksomhed-level arrays if the ansatte endpoint has
+    // no data (e.g. not included in subscription, or new company).
+    //
+    // Within the virksomhed arrays: filter nulls first, then pick the latest
+    // period (monthly > quarterly > annual).
+
     const latestMonthly = latestRecord(
       (company.maanedsbeskaeftigelse || []).filter((r) => r.antalAnsatte != null),
       (r) => r.aar * 100 + (r.maaned || 0)
@@ -147,15 +163,19 @@ export default {
     let employeesSource = "none";
     let employeesPeriod = null;
 
-    if (latestMonthly?.antalAnsatte != null) {
+    if (ansatteLatest != null) {
+      employees = ansatteLatest.ansatte;
+      employeesSource = "ansatte";
+      employeesPeriod = ansatteLatest.dato;
+    } else if (latestMonthly != null) {
       employees = latestMonthly.antalAnsatte;
       employeesSource = "monthly";
       employeesPeriod = `${latestMonthly.aar}-${String(latestMonthly.maaned).padStart(2, "0")}`;
-    } else if (latestQuarterly?.antalAnsatte != null) {
+    } else if (latestQuarterly != null) {
       employees = latestQuarterly.antalAnsatte;
       employeesSource = "quarterly";
       employeesPeriod = `${latestQuarterly.aar}-Q${latestQuarterly.kvartal}`;
-    } else if (latestAnnual?.antalAnsatte != null) {
+    } else if (latestAnnual != null) {
       employees = latestAnnual.antalAnsatte;
       employeesSource = "annual";
       employeesPeriod = String(latestAnnual.aar);
@@ -180,8 +200,12 @@ export default {
         ? {
             debug: {
               companyStatus: companyRes.status,
+              ansatteStatus: ansatteRes.status,
               employeesSource,
               employeesPeriod,
+              ansatteLatest: ansatteLatest
+                ? { dato: ansatteLatest.dato, ansatte: ansatteLatest.ansatte, interval: ansatteLatest.ansatte_interval, rapporteringsinterval: ansatteLatest.rapporteringsinterval }
+                : null,
               latestMonthly: latestMonthly
                 ? { aar: latestMonthly.aar, maaned: latestMonthly.maaned, antalAnsatte: latestMonthly.antalAnsatte, intervalKode: latestMonthly.intervalKodeAntalAnsatte }
                 : null,
