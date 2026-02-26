@@ -92,6 +92,15 @@ export default {
       company?.navne?.[0]?.navn ||
       null;
 
+    // Company form
+    const virksomhedsform =
+      meta?.nyesteVirksomhedsform?.kortBeskrivelse ||
+      company?.virksomhedsform?.[0]?.kortBeskrivelse ||
+      null;
+    const isSoleTrade = virksomhedsform
+      ? virksomhedsform.toLowerCase().includes("enkeltmands")
+      : false;
+
     // Address
     const addr =
       meta?.nyesteBeliggenhedsadresse ||
@@ -120,6 +129,9 @@ export default {
     } else if (quarterly != null) {
       employees = quarterly;
       employeesSource = "quarterly";
+    } else if (isSoleTrade) {
+      employees = 1;
+      employeesSource = "soleTrade";
     }
 
     const payload = {
@@ -129,6 +141,7 @@ export default {
       addressObject,
       employees,
       employeesSource,
+      isSoleTrade,
       ...(debug
         ? {
             debug: {
@@ -140,7 +153,9 @@ export default {
                     ? "virksomhedMetadata.nyesteAarsbeskaeftigelse.antalAnsatte"
                     : employeesSource === "quarterly"
                       ? "virksomhedMetadata.nyesteKvartalsbeskaeftigelse.antalAnsatte"
-                      : "none",
+                      : employeesSource === "soleTrade"
+                        ? "defaulted to 1 (enkeltmandsvirksomhed)"
+                        : "none",
             },
           }
         : {}),

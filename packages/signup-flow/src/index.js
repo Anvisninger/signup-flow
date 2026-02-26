@@ -629,6 +629,14 @@ export function initSignupFlow(userConfig = {}) {
     const cvrInput = document.getElementById(config.cvrInputId);
     if (cvrInput) {
       cvrInput.addEventListener("input", () => showErrorForStep(config, "cvr", ""));
+      cvrInput.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        const currentStep = getCurrentStep(sliderEl);
+        if (currentStep !== "cvr") return;
+        const arrow = sliderEl.querySelector(".w-slider-arrow-right");
+        if (arrow) arrow.click();
+      });
     }
 
     // Email duplicate check runs on confirm click only
