@@ -126,9 +126,22 @@ export default {
     // as well as employees, and it's what virk.dk displays for small firms /
     // sole traders where antalAnsatte is 0.
 
-    const latestMonthly = latestRecord(company.maanedsbeskaeftigelse, (r) => r.aar * 100 + (r.maaned || 0));
-    const latestQuarterly = latestRecord(company.kvartalsbeskaeftigelse, (r) => r.aar * 10 + (r.kvartal || 0));
-    const latestAnnual = latestRecord(company.aarsbeskaeftigelse, (r) => r.aar);
+    // Filter to only records with a reported antalAnsatte before picking the
+    // latest — the CVR array often contains a trailing null entry for the
+    // current (not yet published) period, which would otherwise shadow the
+    // most recent real figure.
+    const latestMonthly = latestRecord(
+      (company.maanedsbeskaeftigelse || []).filter((r) => r.antalAnsatte != null),
+      (r) => r.aar * 100 + (r.maaned || 0)
+    );
+    const latestQuarterly = latestRecord(
+      (company.kvartalsbeskaeftigelse || []).filter((r) => r.antalAnsatte != null),
+      (r) => r.aar * 10 + (r.kvartal || 0)
+    );
+    const latestAnnual = latestRecord(
+      (company.aarsbeskaeftigelse || []).filter((r) => r.antalAnsatte != null),
+      (r) => r.aar
+    );
 
     let employees = null;
     let employeesSource = "none";
