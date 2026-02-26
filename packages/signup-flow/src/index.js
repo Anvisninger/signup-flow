@@ -635,6 +635,7 @@ export function initSignupFlow(userConfig = {}) {
     // (contact has the Bekræft button where Enter should submit normally)
     sliderEl.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;
+      if (nav.isProgrammaticNav) return;
       const currentStep = getCurrentStep(sliderEl);
       if (currentStep === "contact") return; // let Enter reach Bekræft button normally
       const arrow = sliderEl.querySelector(".w-slider-arrow-right");
@@ -705,6 +706,7 @@ export function initSignupFlow(userConfig = {}) {
       async (e) => {
         const nextArrow = e.target.closest(".w-slider-arrow-right");
         if (!nextArrow) return;
+        if (nav.isProgrammaticNav) return;
 
         const currentStep = getCurrentStep(sliderEl);
 

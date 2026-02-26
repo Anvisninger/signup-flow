@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-26T10:54:14.374Z" : null;
+  var BUILD_TIME = true ? "2026-02-26T14:15:22.027Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -586,6 +586,7 @@ var AnvisningerSignupFlow = (() => {
       }
       sliderEl.addEventListener("keydown", (e) => {
         if (e.key !== "Enter") return;
+        if (nav.isProgrammaticNav) return;
         const currentStep = getCurrentStep(sliderEl);
         if (currentStep === "contact") return;
         const arrow = sliderEl.querySelector(".w-slider-arrow-right");
@@ -643,6 +644,7 @@ var AnvisningerSignupFlow = (() => {
         async (e) => {
           const nextArrow = e.target.closest(".w-slider-arrow-right");
           if (!nextArrow) return;
+          if (nav.isProgrammaticNav) return;
           const currentStep = getCurrentStep(sliderEl);
           if (currentStep === "customerType") {
             e.preventDefault();
