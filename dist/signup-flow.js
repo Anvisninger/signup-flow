@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-26T10:47:30.857Z" : null;
+  var BUILD_TIME = true ? "2026-02-26T10:54:14.374Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -583,15 +583,17 @@ var AnvisningerSignupFlow = (() => {
       const cvrInput = document.getElementById(config.cvrInputId);
       if (cvrInput) {
         cvrInput.addEventListener("input", () => showErrorForStep(config, "cvr", ""));
-        cvrInput.addEventListener("keydown", (e) => {
-          if (e.key !== "Enter") return;
-          e.preventDefault();
-          const currentStep = getCurrentStep(sliderEl);
-          if (currentStep !== "cvr") return;
-          const arrow = sliderEl.querySelector(".w-slider-arrow-right");
-          if (arrow) arrow.click();
-        });
       }
+      sliderEl.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        const currentStep = getCurrentStep(sliderEl);
+        if (currentStep === "contact") return;
+        const arrow = sliderEl.querySelector(".w-slider-arrow-right");
+        if (!arrow) return;
+        if (arrow.style.pointerEvents === "none") return;
+        e.preventDefault();
+        arrow.click();
+      });
       attachInputClearer(config.personFieldIds.firstName, "contact", config.personFieldIds.firstName);
       attachInputClearer(config.personFieldIds.lastName, "contact", config.personFieldIds.lastName);
       attachInputClearer(config.personFieldIds.email, "contact", config.personFieldIds.email);
