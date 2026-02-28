@@ -79,7 +79,7 @@ var AnvisningerSignupFlow = (() => {
   }
 
   // packages/signup-flow/src/index.js
-  var BUILD_TIME = true ? "2026-02-28T23:31:45.892Z" : null;
+  var BUILD_TIME = true ? "2026-02-28T23:39:24.652Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",
@@ -716,9 +716,6 @@ var AnvisningerSignupFlow = (() => {
             showOverlay(config.overlayId, true);
             try {
               const data = await fetchCVR(cvr, config);
-              if (data.error) {
-                throw new Error(data.error);
-              }
               if (!data.cvr || !data.name) {
                 throw new Error("CVR blev ikke fundet. Tjek at CVR'et er korrekt.");
               }

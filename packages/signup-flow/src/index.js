@@ -795,11 +795,6 @@ export function initSignupFlow(userConfig = {}) {
           try {
             const data = await fetchCVR(cvr, config);
 
-            // Check if CVR was not found in registry
-            if (data.error) {
-              throw new Error(data.error);
-            }
-
             if (!data.cvr || !data.name) {
               throw new Error("CVR blev ikke fundet. Tjek at CVR'et er korrekt.");
             }

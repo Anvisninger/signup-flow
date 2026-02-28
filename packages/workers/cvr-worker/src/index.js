@@ -38,7 +38,7 @@ export default {
     const debug = url.searchParams.get("debug") === "1";
 
     if (!/^\d{8}$/.test(cvr)) {
-      return json({ error: "Invalid CVR. Must be 8 digits." }, 400, cors);
+      return json({ error: "CVR-nummeret skal være præcis 8 cifre." }, 400, cors);
     }
 
     const companyUrl = `https://api.cvr.dev/api/cvr/virksomhed?cvr_nummer=${encodeURIComponent(cvr)}`;
@@ -82,7 +82,7 @@ export default {
       list = JSON.parse(companyText);
     } catch {
       return json(
-        { error: "Upstream returned invalid JSON.", ...(debug ? { companySample: companyText.slice(0, 800) } : {}) },
+        { error: "Systemet svarede ikke korrekt. Prøv igen senere.", ...(debug ? { companySample: companyText.slice(0, 800) } : {}) },
         502,
         cors
       );

@@ -25,6 +25,13 @@
 			"label": "Deploy v1.10.13",
 			"type": "shell",
 			"command": "npx wrangler deploy --config packages/workers/cvr-worker/wrangler.toml && git add -A && git commit -m \"v1.10.13: translate upstream 404/error messages to Danish\" && git push origin main"
+		},
+		{
+			"label": "Build and deploy v1.10.14",
+			"type": "shell",
+			"command": "node scripts/build-signup-flow.mjs && npx wrangler deploy --config packages/workers/cvr-worker/wrangler.toml && git add -A && git commit -m \"v1.10.14: translate remaining English errors to Danish; remove dead code\" && git push origin main",
+			"isBackground": false,
+			"group": "build"
 		}
 	]
 }
