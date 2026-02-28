@@ -1,6 +1,7 @@
 const ALLOWED_ORIGINS = [
   "https://anvisninger-dk-e81a432f7570a8eceb515ecb.webflow.io",
   "https://anvisninger.dk",
+  "https://www.anvisninger.dk",
 ];
 
 function getCorsHeaders(origin) {

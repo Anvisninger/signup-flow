@@ -1,0 +1,10 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Deploy CORS fix v1.10.11",
+			"type": "shell",
+			"command": "npx wrangler deploy --config packages/workers/outseta-plan-worker/wrangler.toml && npx wrangler deploy --config packages/workers/cvr-worker/wrangler.toml && git add -A && git commit -m \"v1.10.11: add www.anvisninger.dk to ALLOWED_ORIGINS in both workers\" && git push origin main"
+		}
+	]
+}
