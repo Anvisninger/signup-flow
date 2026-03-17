@@ -1,6 +1,7 @@
 const BUILD_TIME = typeof __BUILD_TIME__ !== "undefined" ? __BUILD_TIME__ : null;
 
 import { generateTransactionId, pushGAPurchaseEvent, setupOutsetaCompletionTracking } from "./ga-tracking.js";
+import { initOutsetaMagicLogin } from "../../auth-login/src/index.js";
 
 // TODO: Future improvements:
 // - Optimize error UI: Replace alert() with custom banner/modal for critical errors
@@ -869,8 +870,9 @@ export function initSignupFlow(userConfig = {}) {
             
             // Mark as critical error if worker is broken
             if (err && err.isCritical) {
-              if (typeof window.AnvisningerSignupFlow?.setCriticalError === "function") {
-                window.AnvisningerSignupFlow.setCriticalError();
+              const api = window.AnvisningerAuthFlow || window.AnvisningerSignupFlow;
+              if (typeof api?.setCriticalError === "function") {
+                api.setCriticalError();
               } else {
                 console.warn("[Flow] setCriticalError not available");
               }
@@ -1161,13 +1163,17 @@ export function initSignupFlow(userConfig = {}) {
 }
 
 // Global object to track library state and critical errors
-window.AnvisningerSignupFlow = window.AnvisningerSignupFlow || {};
-window.AnvisningerSignupFlow.initSignupFlow = initSignupFlow;
-window.AnvisningerSignupFlow.isCritical = false;
+window.AnvisningerAuthFlow = window.AnvisningerAuthFlow || {};
+window.AnvisningerAuthFlow.initSignupFlow = initSignupFlow;
+window.AnvisningerAuthFlow.initOutsetaMagicLogin = initOutsetaMagicLogin;
+window.AnvisningerAuthFlow.isCritical = false;
+
+// Backward compatibility alias
+window.AnvisningerSignupFlow = window.AnvisningerAuthFlow;
 
 // Function to mark critical error (called from library when critical errors occur)
-window.AnvisningerSignupFlow.setCriticalError = function() {
-  window.AnvisningerSignupFlow.isCritical = true;
+window.AnvisningerAuthFlow.setCriticalError = function() {
+  window.AnvisningerAuthFlow.isCritical = true;
   console.warn("[Flow] Critical error detected - form is broken");
 };
 

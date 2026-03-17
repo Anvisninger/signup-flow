@@ -1,10 +1,10 @@
 {
-  "name": "@anvisninger/signup-flow",
+  "name": "@anvisninger/auth-flow",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "node ../../scripts/build-signup-flow.mjs"
+    "build": "node ../../scripts/build-auth-flow.mjs"
   }
 }

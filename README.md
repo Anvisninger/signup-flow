@@ -6,7 +6,7 @@
 graph TB
     subgraph "Frontend (Webflow)"
         WF[Webflow Form<br/>Multi-step Slider]
-        JS[signup-flow.js<br/>Main Orchestration]
+        JS[auth-flow.js<br/>Main Orchestration]
         GA[GA4 Tracking<br/>ga-tracking.js]
     end
     

@@ -1,13 +1,14 @@
 {
-  "name": "signup-flow",
+  "name": "auth-flow",
   "private": true,
   "workspaces": [
-    "packages/signup-flow",
+    "packages/auth-flow",
+    "packages/auth-login",
     "packages/workers/*"
   ],
   "scripts": {
     "fmt": "prettier -w .",
-    "build:signup-flow": "node scripts/build-signup-flow.mjs"
+    "build:auth-flow": "node scripts/build-auth-flow.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.27.3",

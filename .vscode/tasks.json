@@ -14,7 +14,7 @@
 		{
 			"label": "Build and deploy v1.10.12",
 			"type": "shell",
-			"command": "node scripts/build-signup-flow.mjs && npx wrangler deploy --config packages/workers/cvr-worker/wrangler.toml && git add -A && git commit -m \"v1.10.12: fix 404 as non-critical user error; guard setCriticalError; Danish CVR not-found message\" && git push origin main"
+			"command": "node scripts/build-auth-flow.mjs && npx wrangler deploy --config packages/workers/cvr-worker/wrangler.toml && git add -A && git commit -m \"v1.10.12: fix 404 as non-critical user error; guard setCriticalError; Danish CVR not-found message\" && git push origin main"
 		},
 		{
 			"label": "Fix gitignore",
@@ -29,7 +29,7 @@
 		{
 			"label": "Build and deploy v1.10.14",
 			"type": "shell",
-			"command": "node scripts/build-signup-flow.mjs && npx wrangler deploy --config packages/workers/cvr-worker/wrangler.toml && git add -A && git commit -m \"v1.10.14: translate remaining English errors to Danish; remove dead code\" && git push origin main",
+			"command": "node scripts/build-auth-flow.mjs && npx wrangler deploy --config packages/workers/cvr-worker/wrangler.toml && git add -A && git commit -m \"v1.10.14: translate remaining English errors to Danish; remove dead code\" && git push origin main",
 			"isBackground": false,
 			"group": "build"
 		}
