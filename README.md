@@ -1,4 +1,4 @@
-# Signup Flow
+# Auth Flow
 
 ## Architecture
 
@@ -153,3 +153,105 @@ graph LR
     style ACCOUNT fill:#FFD700
     style SUB fill:#FFD700
 ```
+
+## Current Package Structure
+
+- `packages/auth-flow` — main signup/onboarding flow + shared browser API export
+- `packages/auth-login` — login page logic (Magic + Outseta handoff)
+- `packages/auth-logout` — logout page logic (Magic + Outseta logout + cleanup)
+- `packages/auth-callback` — callback redirection/orchestration logic
+- `packages/workers/cvr-worker` — CVR lookup and employee enrichment
+- `packages/workers/outseta-plan-worker` — plan lookup and email-check endpoint
+
+## Build
+
+- Build bundle:
+    - `node scripts/build-auth-flow.mjs`
+- Output file:
+    - `dist/auth-flow.js`
+
+`dist/signup-flow.js` has been removed. Use `auth-flow.js` only.
+
+## Browser API
+
+The bundle exposes `window.AnvisningerAuthFlow` with:
+
+- `initSignupFlow()`
+- `initOutsetaMagicLogin()`
+- `initOutsetaMagicLogout()`
+- `initOutsetaAuthCallback()`
+
+## Webflow Integration Snippets
+
+### Signup page
+
+Inside `<head>`:
+
+```html
+<script src="https://anvisninger.github.io/signup-flow/dist/auth-flow.js"></script>
+```
+
+Before `</body>`:
+
+```html
+<script>
+    AnvisningerAuthFlow.initSignupFlow();
+</script>
+```
+
+### Login page
+
+Inside `<head>`:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/magic-sdk/dist/magic.js"></script>
+<script src="https://anvisninger.github.io/signup-flow/dist/auth-flow.js"></script>
+```
+
+Before `</body>`:
+
+```html
+<script>
+    AnvisningerAuthFlow.initOutsetaMagicLogin();
+</script>
+```
+
+### Logout page
+
+Inside `<head>`:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/magic-sdk/dist/magic.js"></script>
+<script src="https://anvisninger.github.io/signup-flow/dist/auth-flow.js"></script>
+```
+
+Before `</body>`:
+
+```html
+<script>
+    AnvisningerAuthFlow.initOutsetaMagicLogout();
+</script>
+```
+
+### Callback page
+
+Inside `<head>`:
+
+```html
+<script src="https://anvisninger.github.io/signup-flow/dist/auth-flow.js"></script>
+```
+
+Before `</body>`:
+
+```html
+<script>
+    AnvisningerAuthFlow.initOutsetaAuthCallback();
+</script>
+```
+
+## Environment Notes
+
+- On production hosts (`anvisninger.dk` and subdomains), auth cookies are written with domain `.anvisninger.dk` for cross-subdomain access.
+- On staging/dev hosts (e.g. `*.webflow.io`), auth cookies are written as host-only cookies.
+- This is expected and prevents invalid cross-domain cookie writes during staging tests.
+
