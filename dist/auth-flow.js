@@ -332,6 +332,7 @@ var AnvisningerAuthFlow = (() => {
     const errorBox = document.getElementById(config.errorBoxId);
     if (!errorBox) {
       console.warn("[Login] error box not found:", config.errorBoxId);
+      window.alert(message);
       return;
     }
     const errorContent = errorBox.querySelector("p") || errorBox;
@@ -341,6 +342,8 @@ var AnvisningerAuthFlow = (() => {
   function clearErrorMessage(config) {
     const errorBox = document.getElementById(config.errorBoxId);
     if (errorBox) {
+      const errorContent = errorBox.querySelector("p") || errorBox;
+      errorContent.textContent = "";
       errorBox.style.display = "none";
     }
   }
@@ -456,7 +459,7 @@ var AnvisningerAuthFlow = (() => {
     const codeAsText = String(code || "").toLowerCase();
     const name = String(error.name || "").toLowerCase();
     const message = String(error.message || "").toLowerCase();
-    return code === -10001 || codeAsText.includes("userCancelled") || codeAsText.includes("cancelled") || name.includes("userCancelled") || name.includes("cancelled") || message.includes("user cancelled") || message.includes("user closed") || message.includes("modal closed") || message.includes("aborted");
+    return code === -10001 || codeAsText.includes("usercancelled") || codeAsText.includes("cancelled") || name.includes("usercancelled") || name.includes("cancelled") || message.includes("user cancelled") || message.includes("user closed") || message.includes("modal closed") || message.includes("aborted");
   }
   function getMagicUserErrorMessage(error) {
     const code = getMagicErrorCode(error);
@@ -560,9 +563,7 @@ var AnvisningerAuthFlow = (() => {
       }
       submitButton.addEventListener("click", (event) => {
         handleLogin(event, config).catch((error) => {
-          if (!isMagicCancellation(error)) {
-            handleLoginError(error, config);
-          }
+          handleLoginError(error, config);
           submitButton.disabled = false;
         });
       });
@@ -646,7 +647,7 @@ var AnvisningerAuthFlow = (() => {
   }
 
   // packages/auth-flow/src/index.js
-  var BUILD_TIME = true ? "2026-03-18T14:18:22.959Z" : null;
+  var BUILD_TIME = true ? "2026-03-18T14:52:35.603Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",

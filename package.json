@@ -10,7 +10,8 @@
   ],
   "scripts": {
     "fmt": "prettier -w .",
-    "build:auth-flow": "node scripts/build-auth-flow.mjs"
+    "build:auth-flow": "node scripts/build-auth-flow.mjs",
+    "test": "node --experimental-default-type=module --test tests/**/*.test.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.27.3",

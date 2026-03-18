@@ -178,6 +178,14 @@ graph LR
 - Output file:
     - `dist/auth-flow.js`
 
+## Tests
+
+- Run all tests:
+    - `npm test`
+- Test scope:
+    - Worker request validation and rate-limiting behavior
+    - Auth package export smoke checks
+
 `dist/signup-flow.js` has been removed. Use `auth-flow.js` only.
 
 ## Browser API
@@ -281,13 +289,14 @@ The login page uses Magic SDK for passwordless authentication via email OTP (one
 
 ## Rate Limiting
 
-All worker endpoints apply progressive rate limiting to protect against abuse:
+Worker endpoints apply abuse protection appropriate to endpoint sensitivity:
 
 - **Email checks (login pre-check):** Allows 2 free checks, then applies escalating cooldowns for subsequent requests
   - This permits users to verify 2-4 different email addresses when unsure which they signed up with
   - Rapid enumeration attempts are slowed by progressive delays
 
-- **Plan lookups and CVR queries:** Protected with standard per-client rate limits
+- **Plan lookups:** Primarily protected by strict origin/method checks and caching
+- **CVR lookups:** Protected with per-client throttling to deter automated bulk testing while allowing normal lookups
 
 **User impact:** Legitimate users won't encounter rate limits. Only abuse patterns (many queries per minute) trigger cooldowns.
 

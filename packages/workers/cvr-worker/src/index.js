@@ -10,6 +10,7 @@ function getCorsHeaders(origin) {
       "Access-Control-Allow-Origin": origin,
       "Access-Control-Allow-Methods": "GET,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
+      Vary: "Origin",
     };
   }
   return {};
@@ -40,6 +41,19 @@ export default {
 
     if (url.pathname !== "/cvr") {
       return new Response("Not found", { status: 404, headers: withSecurityHeaders(cors) });
+    }
+
+    const rateLimit = await getCvrRateLimitState(request, ctx);
+    if (rateLimit.limited) {
+      return json(
+        { error: "For mange CVR-opslag. Vent et øjeblik og prøv igen." },
+        429,
+        {
+          ...cors,
+          "Cache-Control": "no-store",
+          "Retry-After": String(rateLimit.retryAfterSeconds),
+        }
+      );
     }
 
     const cvr = (url.searchParams.get("cvr") || "").replace(/\s+/g, "");
@@ -281,6 +295,78 @@ function formatDkAddress(a) {
 
   const parts = [street, floorDoor, zipCity].filter(Boolean);
   return parts.length ? parts.join(", ") : null;
+}
+
+function getClientFingerprint(request) {
+  const ip = request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for") || "unknown";
+  const userAgent = request.headers.get("User-Agent") || "unknown";
+  return `${ip}|${userAgent}`;
+}
+
+async function getCvrRateLimitState(request, ctx) {
+  const fingerprint = getClientFingerprint(request);
+  const cache = caches.default;
+
+  const counterKey = new Request(
+    `https://internal.anvisninger/cvr-rate-limit/counter/${encodeURIComponent(fingerprint)}`
+  );
+  const lastRequestKey = new Request(
+    `https://internal.anvisninger/cvr-rate-limit/last/${encodeURIComponent(fingerprint)}`
+  );
+
+  const [counterResponse, lastRequestResponse] = await Promise.all([
+    cache.match(counterKey),
+    cache.match(lastRequestKey),
+  ]);
+
+  let requestCount = 0;
+  if (counterResponse) {
+    requestCount = parseInt(await counterResponse.text(), 10) || 0;
+  }
+  requestCount += 1;
+
+  let cooldownSeconds = 0;
+  if (requestCount > 20 && requestCount <= 40) {
+    cooldownSeconds = 2;
+  } else if (requestCount > 40 && requestCount <= 80) {
+    cooldownSeconds = 10;
+  } else if (requestCount > 80) {
+    cooldownSeconds = 60;
+  }
+
+  if (cooldownSeconds > 0 && lastRequestResponse) {
+    const lastRequestTime = parseInt(await lastRequestResponse.text(), 10);
+    const elapsedSeconds = (Date.now() - lastRequestTime) / 1000;
+    if (elapsedSeconds < cooldownSeconds) {
+      const retryAfterSeconds = Math.max(1, Math.ceil(cooldownSeconds - elapsedSeconds));
+      return { limited: true, retryAfterSeconds };
+    }
+  }
+
+  const counterMarker = new Response(String(requestCount), {
+    headers: {
+      "Cache-Control": "max-age=600",
+    },
+  });
+
+  const lastRequestMarker = new Response(String(Date.now()), {
+    headers: {
+      "Cache-Control": `max-age=${Math.max(60, cooldownSeconds)}`,
+    },
+  });
+
+  const write = Promise.all([
+    cache.put(counterKey, counterMarker),
+    cache.put(lastRequestKey, lastRequestMarker),
+  ]);
+
+  if (ctx && typeof ctx.waitUntil === "function") {
+    ctx.waitUntil(write);
+  } else {
+    await write;
+  }
+
+  return { limited: false, retryAfterSeconds: 0 };
 }
 
 function json(obj, status = 200, headers = {}) {

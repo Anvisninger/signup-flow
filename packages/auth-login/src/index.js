@@ -38,17 +38,11 @@ function displayElement(elementId) {
   }
 }
 
-function hideElement(elementId) {
-  const element = document.getElementById(elementId);
-  if (element) {
-    element.style.display = "none";
-  }
-}
-
 function displayErrorMessage(message, config) {
   const errorBox = document.getElementById(config.errorBoxId);
   if (!errorBox) {
     console.warn("[Login] error box not found:", config.errorBoxId);
+    window.alert(message);
     return;
   }
 
@@ -63,6 +57,8 @@ function displayErrorMessage(message, config) {
 function clearErrorMessage(config) {
   const errorBox = document.getElementById(config.errorBoxId);
   if (errorBox) {
+    const errorContent = errorBox.querySelector("p") || errorBox;
+    errorContent.textContent = "";
     errorBox.style.display = "none";
   }
 }
@@ -213,9 +209,9 @@ function isMagicCancellation(error) {
 
   return (
     code === -10001 ||
-    codeAsText.includes("userCancelled") ||
+    codeAsText.includes("usercancelled") ||
     codeAsText.includes("cancelled") ||
-    name.includes("userCancelled") ||
+    name.includes("usercancelled") ||
     name.includes("cancelled") ||
     message.includes("user cancelled") ||
     message.includes("user closed") ||
@@ -355,9 +351,7 @@ export function initOutsetaMagicLogin(userConfig = {}) {
 
     submitButton.addEventListener("click", (event) => {
       handleLogin(event, config).catch((error) => {
-        if (!isMagicCancellation(error)) {
-          handleLoginError(error, config);
-        }
+        handleLoginError(error, config);
         submitButton.disabled = false;
       });
     });
