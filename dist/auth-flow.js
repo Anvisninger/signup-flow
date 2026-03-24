@@ -96,30 +96,58 @@ var AnvisningerAuthFlow = (() => {
     cookieDaysToExpire: 7,
     useWebflowReady: false,
     validPlanUids: [
+      "BWzE5N9E",
+      // Basis
       "zWZLy6Qp",
+      // Pro
       "amR8RM9J",
+      // Pro #1
       "79O8x6WE",
+      // Pro #2
       "j9bn3w9n",
+      // Pro #3
       "zWZG31mp",
+      // Pro #4
       "LmJO1AQP",
+      // Pro #5
       "DQ25J6mV",
+      // Pro #6
       "wmj17oWV",
+      // Pro #7
       "pWrPoaQn",
+      // Pro #8
       "E9L7vZQw",
+      // Pro #9
       "y9gxX8WM",
-      "Rm88n5m4",
+      // Pro #10
       "L9P8AE9J",
+      // Uddannelse
       "amRAV3WJ",
+      // Pro - Introduktionstilbud
       "4960R4mX",
+      // Pro - 1
       "7ma8z1WE",
+      // Pro - 2-5
       "4960KdmX",
+      // Pro - 6-10
       "y9qDkqQA",
+      // Pro - 11-20
       "dQGxko94",
+      // Pro - 21-50
       "OW40EGWg",
+      // Pro - 51-100
       "XQYOn4WP",
+      // Pro - 101-250
       "wQX2vZWK",
+      // Pro - 251-1000
       "L9PMe6WJ",
-      "BWzE5N9E"
+      // Pro - 1000+
+      "dQGxOp94",
+      // Organisation - Lille
+      "OW4073Wg",
+      // Organisation - Mellem
+      "XQYOgRWP"
+      // Organisation - Stor
     ]
   };
   function withDomReady(fn, useWebflowReady) {
@@ -647,7 +675,7 @@ var AnvisningerAuthFlow = (() => {
   }
 
   // packages/auth-flow/src/index.js
-  var BUILD_TIME = true ? "2026-03-19T13:46:42.876Z" : null;
+  var BUILD_TIME = true ? "2026-03-24T09:07:01.722Z" : null;
   var DEFAULT_CONFIG = {
     sliderId: "slider-signup",
     cvrWorkerUrl: "https://anvisninger-cvr-dev.maxks.workers.dev/cvr",

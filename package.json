@@ -11,10 +11,14 @@
   "scripts": {
     "fmt": "prettier -w .",
     "build:auth-flow": "node scripts/build-auth-flow.mjs",
-    "test": "node --experimental-default-type=module --test tests/**/*.test.mjs"
+    "test": "node --experimental-default-type=module --test tests/**/*.test.mjs",
+    "deploy:cvr": "cd packages/workers/cvr-worker && wrangler deploy",
+    "deploy:outseta": "cd packages/workers/outseta-plan-worker && wrangler deploy",
+    "deploy:workers": "npm run deploy:cvr && npm run deploy:outseta"
   },
   "devDependencies": {
     "esbuild": "^0.27.3",
-    "prettier": "^3.0.0"
+    "prettier": "^3.0.0",
+    "wrangler": "^4.76.0"
   }
 }
